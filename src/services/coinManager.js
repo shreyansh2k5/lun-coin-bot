@@ -1,11 +1,12 @@
 // src/services/coinManager.js
+const { DEFAULT_BALANCE } = require('../config/gameConfig'); //
 
 class CoinManager {
     constructor(db) {
         this.db = db;
         this.usersCollection = 'users'; // Name of the Firestore collection for users
         this.coinsField = 'coins';     // Name of the field storing coin balance
-        this.defaultBalance = 10000;   // Default balance for new users
+        this.defaultBalance = DEFAULT_BALANCE;   // Default balance for new users
     }
 
     /**
