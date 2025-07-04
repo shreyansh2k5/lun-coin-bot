@@ -81,6 +81,7 @@ module.exports = (coinManager) => ({
 
     async slashExecute(interaction) {
         const amount = interaction.options.getInteger('amount');
-        await this.executeCommand(interaction.user.id, interaction.user.username, amount, (content, ephemeral) => interaction.followUp({ content, flags: MessageFlags.Ephemeral : 0 }));
+        // Corrected syntax: removed the extra colon after MessageFlags.Ephemeral
+        await this.executeCommand(interaction.user.id, interaction.user.username, amount, (content, ephemeral) => interaction.followUp({ content, flags: ephemeral ? MessageFlags.Ephemeral : 0 }));
     },
 });
