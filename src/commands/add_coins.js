@@ -42,7 +42,7 @@ module.exports = (coinManager, client) => ({
 
         try {
             const newBalance = await coinManager.addCoins(targetUser.id, amount);
-            await replyFunction(`✅ Added ${amount} 💰 to ${targetUser.username}'s balance. New balance: ${newBalance} 💰.`);
+            await replyFunction(`✅ Added **${amount}** 💰 to ${targetUser.username}'s balance. New balance: **${newBalance}** 💰.`);
         } catch (error) {
             console.error(`Error adding coins to ${targetUser.username}:`, error);
             await replyFunction(`An error occurred while adding coins: ${error.message}`, true);
