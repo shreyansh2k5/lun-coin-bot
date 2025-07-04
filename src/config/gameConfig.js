@@ -19,4 +19,12 @@ module.exports = {
     // Roll Command
     ROLL_WIN_MULTIPLIER: 6, // Win amount is bet * (multiplier - 1)
     ROLL_WIN_CONDITION: 6, // Roll a 6 to win
+
+    // Raid Command (New)
+    RAID_SUCCESS_CHANCE: 0.5, // 50% chance
+    RAID_MAX_PERCENTAGE: 0.25, // Max 25% of loser's balance
+    RAID_COOLDOWN_MS: 1 * 60 * 60 * 1000, // 1 hour cooldown
+
+    // Bank Commands (New)
+    BANK_COOLDOWN_MS: 24 * 60 * 60 * 1000, // 24 hours cooldown for deposit/withdraw
 };
