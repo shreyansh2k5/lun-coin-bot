@@ -5,11 +5,14 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Import necessary modules
-const { Client, GatewayIntentBits, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, REST, Routes } = require('discord.js');
 const { initializeFirebase } = require('./src/config/firebaseConfig');
 const CoinManager = require('./src/services/coinManager');
 const commandHandler = require('./src/commands/commandHandler');
-const { startKeepAliveServer } = require('./src/utils/keepAlive'); // Import the new keep-alive function
+const { startKeepAliveServer } = require('./src/utils/keepAlive');
+
+// Define the command prefix
+const PREFIX = '$'; // Changed prefix to '$'
 
 // Initialize Firebase and get the Firestore DB instance
 const db = initializeFirebase();
@@ -22,7 +25,7 @@ const coinManager = new CoinManager(db);
 // Create a new Discord client instance
 const client = new Client({
     intents: [
-        GatewayIntentBits.Guilds,           // Required for guild-related events
+        GatewayIntentBits.Guilds,           // Required for guild-related events (e.g., slash commands)
         GatewayIntentBits.GuildMessages,    // Required for message-related events
         GatewayIntentBits.MessageContent,   // REQUIRED to read message content (enable in Discord Dev Portal)
     ],
@@ -30,30 +33,55 @@ const client = new Client({
 });
 
 // Event listener for when the bot is ready
-client.once('ready', () => {
+client.once('ready', async () => {
     console.log(`Logged in as ${client.user.tag}!`);
     console.log('Bot is online and ready.');
-    // Register all commands once the client is ready and dependencies are available
+
+    // Register all commands and get slash command data
     commandHandler.registerAllCommands(coinManager, client);
+    const slashCommandsData = commandHandler.getSlashCommandsData();
+
+    // Register slash commands globally (for simplicity, guild-specific is faster for testing)
+    if (slashCommandsData.length > 0) {
+        const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
+        try {
+            console.log('Started refreshing application (/) commands.');
+
+            // Use client.application.id for global commands
+            await rest.put(
+                Routes.applicationCommands(client.user.id),
+                { body: slashCommandsData },
+            );
+
+            console.log('Successfully reloaded application (/) commands.');
+        } catch (error) {
+            console.error('Error refreshing application (/) commands:', error);
+        }
+    }
 });
 
-// Event listener for incoming messages
+// Event listener for incoming messages (for prefix commands)
 client.on('messageCreate', async message => {
     // Ignore messages from bots to prevent infinite loops
     if (message.author.bot) return;
 
-    // Define your command prefix
-    const prefix = '!';
-
     // Check if the message starts with the prefix
-    if (!message.content.startsWith(prefix)) return;
+    if (!message.content.startsWith(PREFIX)) return;
 
     // Extract command name and arguments
-    const args = message.content.slice(prefix.length).trim().split(/ +/);
+    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const commandName = args.shift().toLowerCase();
 
-    // Handle commands using the commandHandler
-    commandHandler.handle(commandName, message, args, coinManager, client);
+    // Handle prefix commands
+    commandHandler.handlePrefixCommand(commandName, message, args, coinManager, client);
+});
+
+// Event listener for interactions (for slash commands)
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isChatInputCommand()) return;
+
+    // Handle slash commands
+    commandHandler.handleSlashCommand(interaction, coinManager, client);
 });
 
 // Log in to Discord with your bot token
@@ -70,13 +98,13 @@ client.login(botToken)
     });
 
 // --- Start Keep-Alive HTTP Server for Render ---
-const keepAliveServer = startKeepAliveServer(); // Start the server and get its instance
+const keepAliveServer = startKeepAliveServer();
 
 // Handle graceful shutdown
 process.on('SIGINT', () => {
     console.log('Shutting down bot...');
-    client.destroy(); // Disconnect Discord client
-    keepAliveServer.close(() => { // Close HTTP server gracefully
+    client.destroy();
+    keepAliveServer.close(() => {
         console.log('Keep-alive server closed.');
         process.exit(0);
     });
