@@ -8,8 +8,9 @@ const flipCommand = require('./flip');
 const rollCommand = require('./roll');
 const dailyCommand = require('./daily');
 const begCommand = require('./beg');
-const addCoinsCommand = require('./add_coins'); // NEW
-const deductCoinsCommand = require('./deduct_coins'); // NEW
+const addCoinsCommand = require('./add_coins');
+const deductCoinsCommand = require('./deduct_coins');
+const leaderboardCommand = require('./leaderboard'); // NEW
 
 const { MessageFlags } = require('discord.js');
 
@@ -22,7 +23,7 @@ const slashCommandsData = []; // Array to hold data for Discord API registration
  * Registers a command with the handler.
  * Commands must have a 'name' property.
  * If they have 'prefixExecute', they are registered as prefix commands.
- * If they have 'slashExecute' and 'slashCommandData', they are registered as slash commands.
+ * If they have 'slashExecute', and 'slashCommandData', they are registered as slash commands.
  * @param {object} command The command object.
  */
 function registerCommand(command) {
@@ -52,7 +53,8 @@ function registerAllCommands(coinManager, client) {
     registerCommand(pingCommand);
     registerCommand(balanceCommand(coinManager));
     registerCommand(giveCommand(coinManager, client));
-    registerCommand(helpCommand(prefixCommands, slashCommandsData)); // Help needs access to registered commands
+    // Pass all command maps/data to help command for dynamic listing
+    registerCommand(helpCommand(prefixCommands, slashCommandsData, slashCommands)); // Pass slashCommands map too
 
     // Register new game/activity commands
     registerCommand(flipCommand(coinManager));
@@ -61,8 +63,11 @@ function registerAllCommands(coinManager, client) {
     registerCommand(begCommand(coinManager));
 
     // Register admin commands
-    registerCommand(addCoinsCommand(coinManager, client)); // NEW
-    registerCommand(deductCoinsCommand(coinManager, client)); // NEW
+    registerCommand(addCoinsCommand(coinManager, client));
+    registerCommand(deductCoinsCommand(coinManager, client));
+
+    // Register leaderboard command
+    registerCommand(leaderboardCommand(coinManager, client)); // NEW
 
     console.log(`Registered ${prefixCommands.size} prefix commands.`);
     console.log(`Registered ${slashCommands.size} slash commands.`);
