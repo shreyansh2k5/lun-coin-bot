@@ -1,6 +1,4 @@
 // src/commands/commandHandler.js
-const { Collection, MessageFlags } = require('discord.js'); // Import Collection and MessageFlags
-
 // Import all command modules
 const pingCommand = require('./ping');
 const balanceCommand = require('./balance');
@@ -12,14 +10,13 @@ const dailyCommand = require('./daily');
 const begCommand = require('./beg');
 const addCoinsCommand = require('./add_coins');
 const deductCoinsCommand = require('./deduct_coins');
-const leaderboardCommand = require('./leaderboard');
-const raidCommand = require('./raid'); // NEW
-const bankDepositCommand = require('./bank_deposit'); // NEW
-const bankWithdrawCommand = require('./bank_withdraw'); // NEW
+const leaderboardCommand = require('./leaderboard'); // NEW
+
+const { MessageFlags } = require('discord.js');
 
 // Maps to store commands, accessible by their name
-const prefixCommands = new Collection();
-const slashCommands = new Collection(); // Use Collection for slash commands as well for consistent lookup
+const prefixCommands = new Map();
+const slashCommands = new Map();
 const slashCommandsData = []; // Array to hold data for Discord API registration
 
 /**
@@ -70,12 +67,7 @@ function registerAllCommands(coinManager, client) {
     registerCommand(deductCoinsCommand(coinManager, client));
 
     // Register leaderboard command
-    registerCommand(leaderboardCommand(coinManager, client));
-
-    // Register NEW commands
-    registerCommand(raidCommand(coinManager)); // Raid command
-    registerCommand(bankDepositCommand(coinManager)); // Bank Deposit command
-    registerCommand(bankWithdrawCommand(coinManager)); // Bank Withdraw command
+    registerCommand(leaderboardCommand(coinManager, client)); // NEW
 
     console.log(`Registered ${prefixCommands.size} prefix commands.`);
     console.log(`Registered ${slashCommands.size} slash commands.`);
@@ -99,10 +91,6 @@ async function handlePrefixCommand(commandName, message, args, coinManager, clie
     }
 
     try {
-        // Ensure that prefixExecute is called with the arguments it expects
-        // Many of your commands (like daily, beg, flip, roll) expect only (message, args)
-        // while others (give, add_coins, deduct_coins) expect (message, args, coinManager, client).
-        // We'll pass all arguments for maximum compatibility, and commands can pick what they need.
         await command.prefixExecute(message, args, coinManager, client);
     } catch (error) {
         console.error(`Error executing prefix command $${commandName}:`, error);
@@ -127,13 +115,8 @@ async function handleSlashCommand(interaction, coinManager, client) {
     try {
         // Defer reply to give more time for processing, then follow up
         // Use flags: 0 for public replies (not ephemeral)
-        // Note: The individual command's executeCommand or slashExecute should handle ephemeral replies.
-        await interaction.deferReply({ ephemeral: false }); // Defer as non-ephemeral by default
+        await interaction.deferReply({ flags: 0 });
 
-        // Ensure that slashExecute is called with the arguments it expects
-        // Many of your commands (like daily, beg, flip, roll) expect only (interaction)
-        // while others (give, add_coins, deduct_coins) expect (interaction, coinManager, client).
-        // We'll pass all arguments for maximum compatibility, and commands can pick what they need.
         await command.slashExecute(interaction, coinManager, client);
     } catch (error) {
         console.error(`Error executing slash command /${interaction.commandName}:`, error);
