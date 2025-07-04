@@ -1,5 +1,5 @@
 // src/commands/give.js
-const { SlashCommandBuilder, UserCommand } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 
 /**
  * Factory function to create the give command.
@@ -67,11 +67,11 @@ module.exports = (coinManager, client) => ({
 
             if (success) {
                 await message.channel.send(
-                    `${senderUsername} successfully gave ${amount} 💰 to ${receiverUser.username}!`
+                    `${senderUsername} successfully gave **${amount}** 💰 to ${receiverUser.username}!` // Bold coins
                 );
             } else {
                 await message.channel.send(
-                    `${senderUsername}, you do not have enough coins to give ${amount} 💰 to ${receiverUser.username}.`
+                    `${senderUsername}, you do not have enough coins to give **${amount}** 💰 to ${receiverUser.username}.` // Bold coins
                 );
             }
         } catch (error) {
@@ -94,7 +94,7 @@ module.exports = (coinManager, client) => ({
         const receiverUsername = targetUser.username;
 
         if (senderId === receiverId) {
-            return interaction.followUp({ content: 'You cannot give coins to yourself!', ephemeral: true });
+            return interaction.followUp({ content: 'You cannot give coins to yourself!', flags: MessageFlags.Ephemeral });
         }
 
         try {
@@ -102,17 +102,17 @@ module.exports = (coinManager, client) => ({
 
             if (success) {
                 await interaction.followUp(
-                    `${senderUsername} successfully gave ${amount} 💰 to ${receiverUsername}!`
+                    `${senderUsername} successfully gave **${amount}** 💰 to ${receiverUsername}!` // Bold coins
                 );
             } else {
                 await interaction.followUp({
-                    content: `${senderUsername}, you do not have enough coins to give ${amount} 💰 to ${receiverUsername}.`,
-                    ephemeral: true
+                    content: `${senderUsername}, you do not have enough coins to give **${amount}** 💰 to ${receiverUsername}.`, // Bold coins
+                    flags: MessageFlags.Ephemeral
                 });
             }
         } catch (error) {
             console.error(`Error in /give command from ${senderUsername}:`, error);
-            await interaction.followUp({ content: `An error occurred during the transfer: ${error.message}`, ephemeral: true });
+            await interaction.followUp({ content: `An error occurred during the transfer: ${error.message}`, flags: MessageFlags.Ephemeral });
         }
     },
 });
