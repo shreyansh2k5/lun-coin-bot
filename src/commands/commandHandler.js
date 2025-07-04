@@ -3,11 +3,15 @@
 const pingCommand = require('./ping');
 const balanceCommand = require('./balance');
 const giveCommand = require('./give');
-const helpCommand = require('./help'); // NEW
-const flipCommand = require('./flip'); // NEW
-const rollCommand = require('./roll'); // NEW
-const dailyCommand = require('./daily'); // NEW
-const begCommand = require('./beg'); // NEW
+const helpCommand = require('./help');
+const flipCommand = require('./flip');
+const rollCommand = require('./roll');
+const dailyCommand = require('./daily');
+const begCommand = require('./beg');
+const addCoinsCommand = require('./add_coins'); // NEW
+const deductCoinsCommand = require('./deduct_coins'); // NEW
+
+const { MessageFlags } = require('discord.js');
 
 // Maps to store commands, accessible by their name
 const prefixCommands = new Map();
@@ -56,6 +60,10 @@ function registerAllCommands(coinManager, client) {
     registerCommand(dailyCommand(coinManager));
     registerCommand(begCommand(coinManager));
 
+    // Register admin commands
+    registerCommand(addCoinsCommand(coinManager, client)); // NEW
+    registerCommand(deductCoinsCommand(coinManager, client)); // NEW
+
     console.log(`Registered ${prefixCommands.size} prefix commands.`);
     console.log(`Registered ${slashCommands.size} slash commands.`);
 }
@@ -101,15 +109,17 @@ async function handleSlashCommand(interaction, coinManager, client) {
 
     try {
         // Defer reply to give more time for processing, then follow up
-        await interaction.deferReply({ ephemeral: false }); // ephemeral: true for private replies
+        // Use flags: 0 for public replies (not ephemeral)
+        await interaction.deferReply({ flags: 0 });
 
         await command.slashExecute(interaction, coinManager, client);
     } catch (error) {
         console.error(`Error executing slash command /${interaction.commandName}:`, error);
         if (interaction.replied || interaction.deferred) {
-            await interaction.followUp({ content: `There was an error trying to execute that command: \`${error.message}\``, ephemeral: true });
+            // Use flags: MessageFlags.Ephemeral for ephemeral replies
+            await interaction.followUp({ content: `There was an error trying to execute that command: \`${error.message}\``, flags: MessageFlags.Ephemeral });
         } else {
-            await interaction.reply({ content: `There was an error trying to execute that command: \`${error.message}\``, ephemeral: true });
+            await interaction.reply({ content: `There was an error trying to execute that command: \`${error.message}\``, flags: MessageFlags.Ephemeral });
         }
     }
 }
