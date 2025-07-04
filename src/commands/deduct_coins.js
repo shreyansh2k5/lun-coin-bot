@@ -42,7 +42,7 @@ module.exports = (coinManager, client) => ({
 
         try {
             const newBalance = await coinManager.removeCoins(targetUser.id, amount);
-            await replyFunction(`✅ Deducted ${amount} 💰 from ${targetUser.username}'s balance. New balance: ${newBalance} 💰.`);
+            await replyFunction(`✅ Deducted **${amount}** 💰 from ${targetUser.username}'s balance. New balance: **${newBalance}** 💰.`);
         } catch (error) {
             console.error(`Error deducting coins from ${targetUser.username}:`, error);
             await replyFunction(`An error occurred while deducting coins: ${error.message}`, true);
