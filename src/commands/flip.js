@@ -1,5 +1,6 @@
 // src/commands/flip.js
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { FLIP_WIN_CHANCE } = require('../config/gameConfig'); //
 
 /**
  * Factory function to create the flip command.
@@ -33,7 +34,7 @@ module.exports = (coinManager) => ({
                 return message.channel.send(`${username}, you only have **${balance}** 💰. You cannot bet **${amount}** 💰.`); // Bold coins
             }
 
-            const win = Math.random() < 0.5; // 50% chance
+            const win = Math.random() < FLIP_WIN_CHANCE; // 50% chance
             let newBalance;
             let resultMessage;
 
@@ -63,7 +64,7 @@ module.exports = (coinManager) => ({
                 return interaction.followUp({ content: `${username}, you only have **${balance}** 💰. You cannot bet **${amount}** 💰.`, flags: MessageFlags.Ephemeral }); // Bold coins
             }
 
-            const win = Math.random() < 0.5; // 50% chance
+            const win = Math.random() < FLIP_WIN_CHANCE; // 50% chance
             let newBalance;
             let resultMessage;
 
