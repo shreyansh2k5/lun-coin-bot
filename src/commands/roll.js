@@ -1,5 +1,6 @@
 // src/commands/roll.js
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { ROLL_WIN_MULTIPLIER, ROLL_WIN_CONDITION } = require('../config/gameConfig'); //
 
 /**
  * Factory function to create the roll command.
@@ -34,12 +35,12 @@ module.exports = (coinManager) => ({
             }
 
             const diceRoll = Math.floor(Math.random() * 6) + 1; // Roll a 6-sided dice
-            const winCondition = 6; // Example: Win if you roll a 6
+            // const winCondition = 6; // Example: Win if you roll a 6 // Removed
             let newBalance;
             let resultMessage;
 
-            if (diceRoll === winCondition) {
-                const winnings = amount * 5; // Original bet + 5 times original bet = 6 times total
+            if (diceRoll === ROLL_WIN_CONDITION) { //
+                const winnings = amount * (ROLL_WIN_MULTIPLIER - 1); // Original bet + 5 times original bet = 6 times total
                 newBalance = await coinManager.addCoins(userId, winnings); // Add winnings
                 resultMessage = `🎲 ${username}, you rolled a ${diceRoll} and WON! You gained **${winnings}** 💰. Your new balance is **${newBalance}** 💰.`; // Bold coins
             } else {
@@ -66,12 +67,12 @@ module.exports = (coinManager) => ({
             }
 
             const diceRoll = Math.floor(Math.random() * 6) + 1;
-            const winCondition = 6;
+            // const winCondition = 6; // Removed
             let newBalance;
             let resultMessage;
 
-            if (diceRoll === winCondition) {
-                const winnings = amount * 5;
+            if (diceRoll === ROLL_WIN_CONDITION) { //
+                const winnings = amount * (ROLL_WIN_MULTIPLIER - 1); //
                 newBalance = await coinManager.addCoins(userId, winnings);
                 resultMessage = `🎲 ${username}, you rolled a ${diceRoll} and WON! You gained **${winnings}** 💰. Your new balance is **${newBalance}** 💰.`; // Bold coins
             } else {
