@@ -5,9 +5,24 @@ const { initializeApp } = require('firebase/app'); // Import initializeApp from 
 const { getFirestore } = require('firebase/firestore'); // Import getFirestore from firebase/firestore
 const { getAuth, signInAnonymously, signInWithCustomToken } = require('firebase/auth'); // Import auth functions
 const admin = require('firebase-admin'); // Import firebase-admin
-const serviceAccount = require('./src/config/firebaseConfig.js'); // Your Firebase Admin SDK config
+// const serviceAccount = require('./src/config/firebaseConfig.js'); // REMOVED: We will parse from env directly
 const CoinManager = require('./src/services/coinManager');
 const commandHandler = require('./src/commands/commandHandler'); // Import the commandHandler module
+
+let serviceAccount;
+try {
+    // Attempt to parse the service account key from the environment variable
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+        throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.");
+    }
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+    console.log('Firebase Service Account Key parsed successfully from environment variable.');
+} catch (error) {
+    console.error('Error parsing FIREBASE_SERVICE_ACCOUNT_KEY:', error.message);
+    console.error('Please ensure FIREBASE_SERVICE_ACCOUNT_KEY is a valid JSON string of your service account key file.');
+    process.exit(1); // Exit if parsing fails
+}
+
 
 // Initialize Firebase Admin SDK (for server-side operations if needed, e.g., auth token generation)
 try {
