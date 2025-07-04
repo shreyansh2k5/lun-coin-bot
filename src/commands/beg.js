@@ -1,5 +1,5 @@
 // src/commands/beg.js
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 
 const begCooldowns = new Map(); // Stores userId -> lastUsedTimestamp
 
@@ -33,7 +33,8 @@ module.exports = (coinManager) => ({
             if (seconds > 0) timeString += `${seconds} second(s) `;
             timeString = timeString.trim();
 
-            return replyFunction(`${username}, you can beg again in ${timeString}.`);
+            // Use flags: MessageFlags.Ephemeral for ephemeral replies in slash commands
+            return replyFunction(`${username}, you can beg again in ${timeString}.`, true); // Pass true for ephemeral
         }
 
         try {
@@ -41,22 +42,22 @@ module.exports = (coinManager) => ({
             const newBalance = await coinManager.addCoins(userId, reward);
             begCooldowns.set(userId, now); // Update last used timestamp
 
-            await replyFunction(`🙏 ${username}, you begged and received ${reward} 💰! Your new balance is ${newBalance} 💰.`);
+            await replyFunction(`🙏 ${username}, you begged and received **${reward}** 💰! Your new balance is **${newBalance}** 💰.`); // Bold coins
         } catch (error) {
             console.error(`Error in beg command for ${username}:`, error);
-            await replyFunction(`Sorry ${username}, there was an error while begging: ${error.message}`);
+            await replyFunction(`Sorry ${username}, there was an error while begging: ${error.message}`, true); // Pass true for ephemeral
         }
     },
 
     async prefixExecute(message, args) {
         const userId = message.author.id;
         const username = message.author.username;
-        await this.executeCommand(userId, username, (content) => message.channel.send(content));
+        await this.executeCommand(userId, username, (content, ephemeral) => message.channel.send(content)); // Prefix commands don't use ephemeral
     },
 
     async slashExecute(interaction) {
         const userId = interaction.user.id;
         const username = interaction.user.username;
-        await this.executeCommand(userId, username, (content) => interaction.followUp({ content, ephemeral: false }));
+        await this.executeCommand(userId, username, (content, ephemeral) => interaction.followUp({ content, flags: ephemeral ? MessageFlags.Ephemeral : 0 }));
     },
 });
