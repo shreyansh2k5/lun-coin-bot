@@ -1,145 +1,56 @@
 // src/commands/commandHandler.js
-// Import all command modules
+const { Collection } = require('discord.js');
+
+// Import all command files
 const pingCommand = require('./ping');
 const balanceCommand = require('./balance');
-const giveCommand = require('./give');
-const helpCommand = require('./help');
-const flipCommand = require('./flip');
-const rollCommand = require('./roll');
-const dailyCommand = require('./daily');
-const begCommand = require('./beg');
 const addCoinsCommand = require('./add_coins');
 const deductCoinsCommand = require('./deduct_coins');
-const leaderboardCommand = require('./leaderboard'); // NEW
-
-const { MessageFlags } = require('discord.js');
-
-// Maps to store commands, accessible by their name
-const prefixCommands = new Map();
-const slashCommands = new Map();
-const slashCommandsData = []; // Array to hold data for Discord API registration
+const dailyCommand = require('./daily');
+const begCommand = require('./beg');
+const flipCommand = require('./flip');
+const rollCommand = require('./roll');
+const giveCommand = require('./give');
+const leaderboardCommand = require('./leaderboard');
+const helpCommand = require('./help');
+const raidCommand = require('./raid'); // New
+const bankDepositCommand = require('./bank_deposit'); // New
+const bankWithdrawCommand = require('./bank_withdraw'); // New
 
 /**
- * Registers a command with the handler.
- * Commands must have a 'name' property.
- * If they have 'prefixExecute', they are registered as prefix commands.
- * If they have 'slashExecute', and 'slashCommandData', they are registered as slash commands.
- * @param {object} command The command object.
+ * Initializes and loads all bot commands.
+ * @param {import('../services/coinManager')} coinManager The CoinManager instance.
+ * @returns {{prefixCommands: Collection, slashCommands: Array}} An object containing collections of commands.
  */
-function registerCommand(command) {
-    if (!command.name) {
-        console.warn(`Command object is missing a 'name' property: ${JSON.stringify(command)}`);
-        return;
-    }
+module.exports = (coinManager) => {
+    const prefixCommands = new Collection();
+    const slashCommands = [];
 
-    if (typeof command.prefixExecute === 'function') {
+    // Array of all command factory functions
+    const commandFactories = [
+        pingCommand,
+        balanceCommand,
+        addCoinsCommand,
+        deductCoinsCommand,
+        dailyCommand,
+        begCommand,
+        flipCommand,
+        rollCommand,
+        giveCommand,
+        leaderboardCommand,
+        helpCommand,
+        raidCommand, // Add new command
+        bankDepositCommand, // Add new command
+        bankWithdrawCommand, // Add new command
+    ];
+
+    for (const factory of commandFactories) {
+        const command = factory(coinManager); // Pass coinManager to each command
         prefixCommands.set(command.name, command);
-    }
-
-    if (typeof command.slashExecute === 'function' && command.slashCommandData) {
-        slashCommands.set(command.name, command);
-        slashCommandsData.push(command.slashCommandData.toJSON()); // Store JSON data for API registration
-    }
-}
-
-/**
- * Registers all available commands.
- * This function should be called once when the bot is ready.
- * @param {import('../services/coinManager')} coinManager The CoinManager instance.
- * @param {import('discord.js').Client} client The Discord client instance.
- */
-function registerAllCommands(coinManager, client) {
-    // Register core commands
-    registerCommand(pingCommand);
-    registerCommand(balanceCommand(coinManager));
-    registerCommand(giveCommand(coinManager, client));
-    // Pass all command maps/data to help command for dynamic listing
-    registerCommand(helpCommand(prefixCommands, slashCommandsData, slashCommands)); // Pass slashCommands map too
-
-    // Register new game/activity commands
-    registerCommand(flipCommand(coinManager));
-    registerCommand(rollCommand(coinManager));
-    registerCommand(dailyCommand(coinManager));
-    registerCommand(begCommand(coinManager));
-
-    // Register admin commands
-    registerCommand(addCoinsCommand(coinManager, client));
-    registerCommand(deductCoinsCommand(coinManager, client));
-
-    // Register leaderboard command
-    registerCommand(leaderboardCommand(coinManager, client)); // NEW
-
-    console.log(`Registered ${prefixCommands.size} prefix commands.`);
-    console.log(`Registered ${slashCommands.size} slash commands.`);
-}
-
-/**
- * Handles an incoming Discord message, attempting to execute a prefix command.
- * @param {string} commandName The name of the command to execute.
- * @param {import('discord.js').Message} message The Discord message object.
- * @param {string[]} args An array of arguments passed to the command.
- * @param {import('../services/coinManager')} coinManager The CoinManager instance.
- * @param {import('discord.js').Client} client The Discord client instance.
- */
-async function handlePrefixCommand(commandName, message, args, coinManager, client) {
-    const command = prefixCommands.get(commandName);
-
-    if (!command) {
-        // Optionally, send a message if command is not found
-        // message.channel.send(`Sorry, I don't recognize the command \`$${commandName}\`.`);
-        return;
-    }
-
-    try {
-        await command.prefixExecute(message, args, coinManager, client);
-    } catch (error) {
-        console.error(`Error executing prefix command $${commandName}:`, error);
-        message.channel.send(`There was an error trying to execute that command: \`${error.message}\``);
-    }
-}
-
-/**
- * Handles an incoming Discord interaction, attempting to execute a slash command.
- * @param {import('discord.js').ChatInputCommandInteraction} interaction The Discord chat input command interaction object.
- * @param {import('../services/coinManager')} coinManager The CoinManager instance.
- * @param {import('discord.js').Client} client The Discord client instance.
- */
-async function handleSlashCommand(interaction, coinManager, client) {
-    const command = slashCommands.get(interaction.commandName);
-
-    if (!command) {
-        console.error(`No command matching ${interaction.commandName} was found.`);
-        return;
-    }
-
-    try {
-        // Defer reply to give more time for processing, then follow up
-        // Use flags: 0 for public replies (not ephemeral)
-        await interaction.deferReply({ flags: 0 });
-
-        await command.slashExecute(interaction, coinManager, client);
-    } catch (error) {
-        console.error(`Error executing slash command /${interaction.commandName}:`, error);
-        if (interaction.replied || interaction.deferred) {
-            // Use flags: MessageFlags.Ephemeral for ephemeral replies
-            await interaction.followUp({ content: `There was an error trying to execute that command: \`${error.message}\``, flags: MessageFlags.Ephemeral });
-        } else {
-            await interaction.reply({ content: `There was an error trying to execute that command: \`${error.message}\``, flags: MessageFlags.Ephemeral });
+        if (command.slashCommandData) {
+            slashCommands.push(command.slashCommandData.toJSON());
         }
     }
-}
 
-/**
- * Returns the array of slash command data for Discord API registration.
- * @returns {Array<object>} An array of slash command JSON objects.
- */
-function getSlashCommandsData() {
-    return slashCommandsData;
-}
-
-module.exports = {
-    registerAllCommands,
-    handlePrefixCommand,
-    handleSlashCommand,
-    getSlashCommandsData
+    return { prefixCommands, slashCommands };
 };
