@@ -26,7 +26,7 @@ module.exports = (coinManager) => ({
 
         try {
             const balance = await coinManager.getBalance(userId);
-            await message.channel.send(`${username}, your current coin balance is: ${balance} 💰`);
+            await message.channel.send(`${username}, your current coin balance is: **${balance}** 💰`); // Bold coins
         } catch (error) {
             console.error(`Error in $balance command for ${username}:`, error);
             await message.channel.send(`Sorry ${username}, I couldn't fetch your balance right now.`);
@@ -43,7 +43,7 @@ module.exports = (coinManager) => ({
 
         try {
             const balance = await coinManager.getBalance(userId);
-            await interaction.followUp(`${username}, your current coin balance is: ${balance} 💰`);
+            await interaction.followUp(`${username}, your current coin balance is: **${balance}** 💰`); // Bold coins
         } catch (error) {
             console.error(`Error in /balance command for ${username}:`, error);
             await interaction.followUp(`Sorry ${username}, I couldn't fetch your balance right now.`);
