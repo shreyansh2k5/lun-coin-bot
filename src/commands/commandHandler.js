@@ -1,4 +1,6 @@
 // src/commands/commandHandler.js
+const { Collection, MessageFlags } = require('discord.js'); // Import Collection and MessageFlags
+
 // Import all command modules
 const pingCommand = require('./ping');
 const balanceCommand = require('./balance');
@@ -10,13 +12,14 @@ const dailyCommand = require('./daily');
 const begCommand = require('./beg');
 const addCoinsCommand = require('./add_coins');
 const deductCoinsCommand = require('./deduct_coins');
-const leaderboardCommand = require('./leaderboard'); // NEW
-
-const { MessageFlags } = require('discord.js');
+const leaderboardCommand = require('./leaderboard');
+// Removed: const raidCommand = require('./raid');
+// Removed: const bankDepositCommand = require('./bank_deposit');
+// Removed: const bankWithdrawCommand = require('./bank_withdraw');
 
 // Maps to store commands, accessible by their name
-const prefixCommands = new Map();
-const slashCommands = new Map();
+const prefixCommands = new Collection();
+const slashCommands = new Collection(); // Use Collection for slash commands as well for consistent lookup
 const slashCommandsData = []; // Array to hold data for Discord API registration
 
 /**
@@ -67,7 +70,12 @@ function registerAllCommands(coinManager, client) {
     registerCommand(deductCoinsCommand(coinManager, client));
 
     // Register leaderboard command
-    registerCommand(leaderboardCommand(coinManager, client)); // NEW
+    registerCommand(leaderboardCommand(coinManager, client));
+
+    // Removed registration for raid, bank_deposit, bank_withdraw commands
+    // registerCommand(raidCommand(coinManager));
+    // registerCommand(bankDepositCommand(coinManager));
+    // registerCommand(bankWithdrawCommand(coinManager));
 
     console.log(`Registered ${prefixCommands.size} prefix commands.`);
     console.log(`Registered ${slashCommands.size} slash commands.`);
@@ -93,8 +101,12 @@ async function handlePrefixCommand(commandName, message, args, coinManager, clie
     try {
         await command.prefixExecute(message, args, coinManager, client);
     } catch (error) {
-        console.error(`Error executing prefix command $${commandName}:`, error);
-        message.channel.send(`There was an error trying to execute that command: \`${error.message}\``);
+            console.error(`Error executing prefix command $${commandName}:`, error);
+            // Check if the message has already been replied to or deleted to avoid errors
+            if (!message.deleted) {
+                message.channel.send(`There was an error trying to execute that command: \`${error.message}\``)
+                    .catch(e => console.error("Failed to send error message:", e));
+            }
     }
 }
 
@@ -109,22 +121,26 @@ async function handleSlashCommand(interaction, coinManager, client) {
 
     if (!command) {
         console.error(`No command matching ${interaction.commandName} was found.`);
+        // If interaction is not yet replied/deferred, send an ephemeral error
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: 'Sorry, that command was not found.', ephemeral: true }).catch(e => console.error("Failed to send command not found error:", e));
+        }
         return;
     }
 
     try {
-        // Defer reply to give more time for processing, then follow up
-        // Use flags: 0 for public replies (not ephemeral)
-        await interaction.deferReply({ flags: 0 });
-
+        // IMPORTANT: The individual command's slashExecute method is now responsible
+        // for calling interaction.deferReply() or interaction.reply()
         await command.slashExecute(interaction, coinManager, client);
     } catch (error) {
         console.error(`Error executing slash command /${interaction.commandName}:`, error);
+        // Check if the interaction has already been replied to or deferred
         if (interaction.replied || interaction.deferred) {
-            // Use flags: MessageFlags.Ephemeral for ephemeral replies
-            await interaction.followUp({ content: `There was an error trying to execute that command: \`${error.message}\``, flags: MessageFlags.Ephemeral });
+            await interaction.followUp({ content: `There was an error trying to execute that command: \`${error.message}\``, flags: MessageFlags.Ephemeral })
+                .catch(e => console.error("Failed to send followUp error message:", e));
         } else {
-            await interaction.reply({ content: `There was an error trying to execute that command: \`${error.message}\``, flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: `There was an error trying to execute that command: \`${error.message}\``, flags: MessageFlags.Ephemeral })
+                .catch(e => console.error("Failed to send reply error message:", e));
         }
     }
 }
