@@ -1,5 +1,5 @@
 // src/commands/flip.js
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 
 /**
  * Factory function to create the flip command.
@@ -30,7 +30,7 @@ module.exports = (coinManager) => ({
         try {
             const balance = await coinManager.getBalance(userId);
             if (balance < amount) {
-                return message.channel.send(`${username}, you only have ${balance} 💰. You cannot bet ${amount} 💰.`);
+                return message.channel.send(`${username}, you only have **${balance}** 💰. You cannot bet **${amount}** 💰.`); // Bold coins
             }
 
             const win = Math.random() < 0.5; // 50% chance
@@ -39,10 +39,10 @@ module.exports = (coinManager) => ({
 
             if (win) {
                 newBalance = await coinManager.addCoins(userId, amount);
-                resultMessage = `🎉 ${username}, you won the coin flip and doubled your bet! You gained ${amount} 💰. Your new balance is ${newBalance} 💰.`;
+                resultMessage = `🎉 ${username}, you won the coin flip and doubled your bet! You gained **${amount}** 💰. Your new balance is **${newBalance}** 💰.`; // Bold coins
             } else {
                 newBalance = await coinManager.removeCoins(userId, amount);
-                resultMessage = `💔 ${username}, you lost the coin flip and lost ${amount} 💰. Your new balance is ${newBalance} 💰.`;
+                resultMessage = `💔 ${username}, you lost the coin flip and lost **${amount}** 💰. Your new balance is **${newBalance}** 💰.`; // Bold coins
             }
             await message.channel.send(resultMessage);
 
@@ -60,7 +60,7 @@ module.exports = (coinManager) => ({
         try {
             const balance = await coinManager.getBalance(userId);
             if (balance < amount) {
-                return interaction.followUp({ content: `${username}, you only have ${balance} 💰. You cannot bet ${amount} 💰.`, ephemeral: true });
+                return interaction.followUp({ content: `${username}, you only have **${balance}** 💰. You cannot bet **${amount}** 💰.`, flags: MessageFlags.Ephemeral }); // Bold coins
             }
 
             const win = Math.random() < 0.5; // 50% chance
@@ -69,16 +69,16 @@ module.exports = (coinManager) => ({
 
             if (win) {
                 newBalance = await coinManager.addCoins(userId, amount);
-                resultMessage = `🎉 ${username}, you won the coin flip and doubled your bet! You gained ${amount} 💰. Your new balance is ${newBalance} 💰.`;
+                resultMessage = `🎉 ${username}, you won the coin flip and doubled your bet! You gained **${amount}** 💰. Your new balance is **${newBalance}** 💰.`; // Bold coins
             } else {
                 newBalance = await coinManager.removeCoins(userId, amount);
-                resultMessage = `💔 ${username}, you lost the coin flip and lost ${amount} 💰. Your new balance is ${newBalance} 💰.`;
+                resultMessage = `💔 ${username}, you lost the coin flip and lost **${amount}** 💰. Your new balance is **${newBalance}** 💰.`; // Bold coins
             }
             await interaction.followUp(resultMessage);
 
         } catch (error) {
             console.error(`Error in /flip command for ${username}:`, error);
-            await interaction.followUp({ content: `An error occurred during the coin flip: ${error.message}`, ephemeral: true });
+            await interaction.followUp({ content: `An error occurred during the coin flip: ${error.message}`, flags: MessageFlags.Ephemeral });
         }
     },
 });
