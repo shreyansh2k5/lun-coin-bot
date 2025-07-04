@@ -1,5 +1,5 @@
 // src/commands/roll.js
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 
 /**
  * Factory function to create the roll command.
@@ -30,7 +30,7 @@ module.exports = (coinManager) => ({
         try {
             const balance = await coinManager.getBalance(userId);
             if (balance < amount) {
-                return message.channel.send(`${username}, you only have ${balance} 💰. You cannot bet ${amount} 💰.`);
+                return message.channel.send(`${username}, you only have **${balance}** 💰. You cannot bet **${amount}** 💰.`); // Bold coins
             }
 
             const diceRoll = Math.floor(Math.random() * 6) + 1; // Roll a 6-sided dice
@@ -41,10 +41,10 @@ module.exports = (coinManager) => ({
             if (diceRoll === winCondition) {
                 const winnings = amount * 5; // Original bet + 5 times original bet = 6 times total
                 newBalance = await coinManager.addCoins(userId, winnings); // Add winnings
-                resultMessage = `🎲 ${username}, you rolled a ${diceRoll} and WON! You gained ${winnings} 💰. Your new balance is ${newBalance} 💰.`;
+                resultMessage = `🎲 ${username}, you rolled a ${diceRoll} and WON! You gained **${winnings}** 💰. Your new balance is **${newBalance}** 💰.`; // Bold coins
             } else {
                 newBalance = await coinManager.removeCoins(userId, amount); // Lose original bet
-                resultMessage = `💔 ${username}, you rolled a ${diceRoll} and LOST. You lost ${amount} 💰. Your new balance is ${newBalance} 💰.`;
+                resultMessage = `💔 ${username}, you rolled a ${diceRoll} and LOST. You lost **${amount}** 💰. Your new balance is **${newBalance}** 💰.`; // Bold coins
             }
             await message.channel.send(resultMessage);
 
@@ -62,7 +62,7 @@ module.exports = (coinManager) => ({
         try {
             const balance = await coinManager.getBalance(userId);
             if (balance < amount) {
-                return interaction.followUp({ content: `${username}, you only have ${balance} 💰. You cannot bet ${amount} 💰.`, ephemeral: true });
+                return interaction.followUp({ content: `${username}, you only have **${balance}** 💰. You cannot bet **${amount}** 💰.`, flags: MessageFlags.Ephemeral }); // Bold coins
             }
 
             const diceRoll = Math.floor(Math.random() * 6) + 1;
@@ -73,16 +73,16 @@ module.exports = (coinManager) => ({
             if (diceRoll === winCondition) {
                 const winnings = amount * 5;
                 newBalance = await coinManager.addCoins(userId, winnings);
-                resultMessage = `🎲 ${username}, you rolled a ${diceRoll} and WON! You gained ${winnings} 💰. Your new balance is ${newBalance} 💰.`;
+                resultMessage = `🎲 ${username}, you rolled a ${diceRoll} and WON! You gained **${winnings}** 💰. Your new balance is **${newBalance}** 💰.`; // Bold coins
             } else {
                 newBalance = await coinManager.removeCoins(userId, amount);
-                resultMessage = `💔 ${username}, you rolled a ${diceRoll} and LOST. You lost ${amount} 💰. Your new balance is ${newBalance} 💰.`;
+                resultMessage = `💔 ${username}, you rolled a ${diceRoll} and LOST. You lost **${amount}** 💰. Your new balance is **${newBalance}** 💰.`; // Bold coins
             }
             await interaction.followUp(resultMessage);
 
         } catch (error) {
             console.error(`Error in /roll command for ${username}:`, error);
-            await interaction.followUp({ content: `An error occurred during the dice roll: ${error.message}`, ephemeral: true });
+            await interaction.followUp({ content: `An error occurred during the dice roll: ${error.message}`, flags: MessageFlags.Ephemeral });
         }
     },
 });
