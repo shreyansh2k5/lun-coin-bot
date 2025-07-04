@@ -1,4 +1,5 @@
 // src/commands/give.js
+const { SlashCommandBuilder, UserCommand } = require('discord.js');
 
 /**
  * Factory function to create the give command.
@@ -8,25 +9,39 @@
  */
 module.exports = (coinManager, client) => ({
     name: 'give',
-    description: 'Gives coins to another user. Usage: !give @user <amount>',
+    description: 'Gives coins to another user.',
+    // Slash command data for Discord API registration
+    slashCommandData: new SlashCommandBuilder()
+        .setName('give')
+        .setDescription('Gives coins to another user.')
+        .addUserOption(option =>
+            option.setName('target')
+                .setDescription('The user to give coins to')
+                .setRequired(true))
+        .addIntegerOption(option =>
+            option.setName('amount')
+                .setDescription('The amount of coins to give')
+                .setRequired(true)
+                .setMinValue(1)), // Ensure amount is positive
+
     /**
-     * Executes the give command.
+     * Executes the give command for prefix messages.
      * @param {import('discord.js').Message} message The Discord message object.
      * @param {string[]} args An array of arguments. Expected: [userMention, amount]
      */
-    async execute(message, args) {
+    async prefixExecute(message, args) {
         const senderId = message.author.id;
         const senderUsername = message.author.username;
 
         if (args.length !== 2) {
-            return message.channel.send('Usage: `!give @user <amount>`');
+            return message.channel.send('Usage: `$give @user <amount>`');
         }
 
         const mention = args[0];
         const amountStr = args[1];
 
         // Extract receiver ID from mention
-        const receiverId = mention.replace(/[^0-9]/g, ''); // Remove non-numeric characters
+        const receiverId = mention.replace(/[^0-9]/g, '');
 
         if (!receiverId) {
             return message.channel.send('Please mention a valid user to give coins to.');
@@ -43,7 +58,6 @@ module.exports = (coinManager, client) => ({
         }
 
         try {
-            // Fetch the receiver user object to display their username
             const receiverUser = await client.users.fetch(receiverId);
             if (!receiverUser) {
                 return message.channel.send('Could not find the mentioned user.');
@@ -56,14 +70,49 @@ module.exports = (coinManager, client) => ({
                     `${senderUsername} successfully gave ${amount} 💰 to ${receiverUser.username}!`
                 );
             } else {
-                // This typically means insufficient funds
                 await message.channel.send(
                     `${senderUsername}, you do not have enough coins to give ${amount} 💰 to ${receiverUser.username}.`
                 );
             }
         } catch (error) {
-            console.error(`Error in !give command from ${senderUsername}:`, error);
+            console.error(`Error in $give command from ${senderUsername}:`, error);
             await message.channel.send(`An error occurred during the transfer: ${error.message}`);
+        }
+    },
+
+    /**
+     * Executes the give command for slash commands.
+     * @param {import('discord.js').ChatInputCommandInteraction} interaction The interaction object.
+     */
+    async slashExecute(interaction) {
+        const senderId = interaction.user.id;
+        const senderUsername = interaction.user.username;
+        const targetUser = interaction.options.getUser('target');
+        const amount = interaction.options.getInteger('amount');
+
+        const receiverId = targetUser.id;
+        const receiverUsername = targetUser.username;
+
+        if (senderId === receiverId) {
+            return interaction.followUp({ content: 'You cannot give coins to yourself!', ephemeral: true });
+        }
+
+        try {
+            const success = await coinManager.transferCoins(senderId, receiverId, amount);
+
+            if (success) {
+                await interaction.followUp(
+                    `${senderUsername} successfully gave ${amount} 💰 to ${receiverUsername}!`
+                );
+            } else {
+                await interaction.followUp({
+                    content: `${senderUsername}, you do not have enough coins to give ${amount} 💰 to ${receiverUsername}.`,
+                    ephemeral: true
+                });
+            }
+        } catch (error) {
+            console.error(`Error in /give command from ${senderUsername}:`, error);
+            await interaction.followUp({ content: `An error occurred during the transfer: ${error.message}`, ephemeral: true });
         }
     },
 });
