@@ -21,6 +21,6 @@
     "dotenv": "^16.4.5"
   },
   "engines": {
-    "node": "18.x"
+    "node": "20.x" // Change this from "18.x" to "20.x" or "22.x"
   }
 }
