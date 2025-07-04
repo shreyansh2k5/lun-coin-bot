@@ -1,11 +1,12 @@
 // src/commands/beg.js
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { MIN_BEG_REWARD, MAX_BEG_REWARD, BEG_COOLDOWN_MS } = require('../config/gameConfig'); //
 
 const begCooldowns = new Map(); // Stores userId -> lastUsedTimestamp
 
-const MIN_BEG_REWARD = 1;
-const MAX_BEG_REWARD = 1000;
-const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
+// const MIN_BEG_REWARD = 1; // Removed
+// const MAX_BEG_REWARD = 1000; // Removed
+// const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes in milliseconds // Removed
 
 /**
  * Factory function to create the beg command.
@@ -14,17 +15,17 @@ const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
  */
 module.exports = (coinManager) => ({
     name: 'beg',
-    description: `Beg for coins! Get 1-${MAX_BEG_REWARD} coins every 5 minutes.`,
+    description: `Beg for coins! Get ${MIN_BEG_REWARD}-${MAX_BEG_REWARD} coins every 5 minutes.`, //
     slashCommandData: new SlashCommandBuilder()
         .setName('beg')
-        .setDescription(`Beg for coins! Get 1-${MAX_BEG_REWARD} coins every 5 minutes.`),
+        .setDescription(`Beg for coins! Get ${MIN_BEG_REWARD}-${MAX_BEG_REWARD} coins every 5 minutes.`), //
 
     async executeCommand(userId, username, replyFunction) {
         const now = Date.now();
         const lastUsed = begCooldowns.get(userId);
 
-        if (lastUsed && (now - lastUsed < COOLDOWN_MS)) {
-            const timeLeft = COOLDOWN_MS - (now - lastUsed);
+        if (lastUsed && (now - lastUsed < BEG_COOLDOWN_MS)) { //
+            const timeLeft = BEG_COOLDOWN_MS - (now - lastUsed); //
             const minutes = Math.floor(timeLeft / (1000 * 60));
             const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
 
@@ -38,7 +39,7 @@ module.exports = (coinManager) => ({
         }
 
         try {
-            const reward = Math.floor(Math.random() * (MAX_BEG_REWARD - MIN_BEG_REWARD + 1)) + MIN_BEG_REWARD;
+            const reward = Math.floor(Math.random() * (MAX_BEG_REWARD - MIN_BEG_REWARD + 1)) + MIN_BEG_REWARD; //
             const newBalance = await coinManager.addCoins(userId, reward);
             begCooldowns.set(userId, now); // Update last used timestamp
 
