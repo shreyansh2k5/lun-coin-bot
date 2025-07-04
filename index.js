@@ -1,5 +1,5 @@
+// index.js
 // Load environment variables from .env file if running locally
-// This line is for local development only and will be ignored by Render's environment variables.
 if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config();
 }
@@ -9,6 +9,7 @@ const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const { initializeFirebase } = require('./src/config/firebaseConfig');
 const CoinManager = require('./src/services/coinManager');
 const commandHandler = require('./src/commands/commandHandler');
+const { startKeepAliveServer } = require('./src/utils/keepAlive'); // Import the new keep-alive function
 
 // Initialize Firebase and get the Firestore DB instance
 const db = initializeFirebase();
@@ -32,6 +33,8 @@ const client = new Client({
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
     console.log('Bot is online and ready.');
+    // Register all commands once the client is ready and dependencies are available
+    commandHandler.registerAllCommands(coinManager, client);
 });
 
 // Event listener for incoming messages
@@ -66,9 +69,15 @@ client.login(botToken)
         process.exit(1);
     });
 
+// --- Start Keep-Alive HTTP Server for Render ---
+const keepAliveServer = startKeepAliveServer(); // Start the server and get its instance
+
 // Handle graceful shutdown
 process.on('SIGINT', () => {
     console.log('Shutting down bot...');
-    client.destroy();
-    process.exit(0);
+    client.destroy(); // Disconnect Discord client
+    keepAliveServer.close(() => { // Close HTTP server gracefully
+        console.log('Keep-alive server closed.');
+        process.exit(0);
+    });
 });
