@@ -5,12 +5,13 @@ class CoinManager {
         this.db = db;
         this.usersCollection = 'users'; // Name of the Firestore collection for users
         this.coinsField = 'coins';     // Name of the field storing coin balance
+        this.defaultBalance = 10000;   // NEW: Default balance for new users
     }
 
     /**
      * Gets the current coin balance for a user.
      * If the user's document does not exist in Firestore, it will be created
-     * and initialized with 0 coins.
+     * and initialized with the default balance.
      *
      * @param {string} userId The Discord user ID.
      * @returns {Promise<number>} A Promise that resolves with the user's coin balance.
@@ -25,9 +26,9 @@ class CoinManager {
                 // Ensure coins is a number, default to 0 if not found or null
                 return typeof data[this.coinsField] === 'number' ? data[this.coinsField] : 0;
             } else {
-                // User does not exist, initialize with 0 coins
-                await userRef.set({ [this.coinsField]: 0 });
-                return 0;
+                // User does not exist, initialize with default balance
+                await userRef.set({ [this.coinsField]: this.defaultBalance });
+                return this.defaultBalance;
             }
         } catch (error) {
             console.error(`Error getting balance for user ${userId}:`, error);
