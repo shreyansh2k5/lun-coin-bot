@@ -1,0 +1,26 @@
+{
+  "name": "lun-coin-bot",
+  "version": "1.0.0",
+  "description": "A Discord bot with a global coin system.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "nodejs",
+    "firebase",
+    "coins"
+  ],
+  "author": "shreyansh2k5",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.15.3",
+    "firebase-admin": "^12.2.0",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
