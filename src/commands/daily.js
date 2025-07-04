@@ -1,10 +1,11 @@
 // src/commands/daily.js
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { DAILY_REWARD, DAILY_COOLDOWN_MS } = require('../config/gameConfig'); //
 
 const dailyCooldowns = new Map(); // Stores userId -> lastUsedTimestamp
 
-const DAILY_REWARD = 5000;
-const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+// const DAILY_REWARD = 5000; // Removed
+// const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds // Removed
 
 /**
  * Factory function to create the daily command.
@@ -22,8 +23,8 @@ module.exports = (coinManager) => ({
         const now = Date.now();
         const lastUsed = dailyCooldowns.get(userId);
 
-        if (lastUsed && (now - lastUsed < COOLDOWN_MS)) {
-            const timeLeft = COOLDOWN_MS - (now - lastUsed);
+        if (lastUsed && (now - lastUsed < DAILY_COOLDOWN_MS)) { //
+            const timeLeft = DAILY_COOLDOWN_MS - (now - lastUsed); //
             const hours = Math.floor(timeLeft / (1000 * 60 * 60));
             const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
@@ -39,7 +40,7 @@ module.exports = (coinManager) => ({
         }
 
         try {
-            const newBalance = await coinManager.addCoins(userId, DAILY_REWARD);
+            const newBalance = await coinManager.addCoins(userId, DAILY_REWARD); //
             dailyCooldowns.set(userId, now); // Update last used timestamp
             await replyFunction(`🎉 ${username}, you claimed your daily **${DAILY_REWARD}** 💰! Your new balance is **${newBalance}** 💰.`); // Bold coins
         } catch (error) {
