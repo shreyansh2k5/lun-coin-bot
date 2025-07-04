@@ -5,7 +5,7 @@ class CoinManager {
         this.db = db;
         this.usersCollection = 'users'; // Name of the Firestore collection for users
         this.coinsField = 'coins';     // Name of the field storing coin balance
-        this.defaultBalance = 10000;   // NEW: Default balance for new users
+        this.defaultBalance = 10000;   // Default balance for new users
     }
 
     /**
@@ -140,6 +140,27 @@ class CoinManager {
         } catch (error) {
             console.error(`Error updating coins for user ${userId}:`, error.message);
             throw error; // Re-throw the error for the calling command to handle
+        }
+    }
+
+    /**
+     * Fetches all users and their coin balances from Firestore.
+     * @returns {Promise<Array<{userId: string, coins: number}>>} A promise that resolves to an array of user objects.
+     */
+    async getAllUserBalances() {
+        try {
+            const snapshot = await this.db.collection(this.usersCollection).get();
+            const users = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                if (typeof data[this.coinsField] === 'number') {
+                    users.push({ userId: doc.id, coins: data[this.coinsField] });
+                }
+            });
+            return users;
+        } catch (error) {
+            console.error('Error fetching all user balances:', error);
+            return [];
         }
     }
 }
