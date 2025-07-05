@@ -1,16 +1,13 @@
 // index.js
 require('dotenv').config(); // Load environment variables from .env file
 const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
-// Removed client SDK imports: const { initializeApp } = require('firebase/app');
-// Removed client SDK imports: const { getFirestore } = require('firebase/firestore');
-// Removed client SDK imports: const { getAuth, signInAnonymously, signInWithCustomToken } = require('firebase/auth');
 const admin = require('firebase-admin'); // Keep admin SDK import
 const { initializeFirebase, getFirestore } = require('./src/config/firebaseConfig.js'); // Import from your original firebaseConfig.js
 const CoinManager = require('./src/services/coinManager');
 const commandHandler = require('./src/commands/commandHandler');
-const keepAlive = require('./src/utils/keepAlive');
-const { setBotActivity } = require('./src/utils/richPresence'); // Import the new richPresence utility
-const { ActivityType } = require('discord.js'); // Keep ActivityType import for rich presence
+const { keepAlive } = require('./src/utils/keepAlive'); // Corrected: Destructure keepAlive
+const { setBotActivity } = require('./src/utils/richPresence');
+const { ActivityType } = require('discord.js');
 
 // Initialize Firebase Admin SDK and get Firestore instance using your original method
 const db = initializeFirebase(); // Call your initializeFirebase function
@@ -20,15 +17,6 @@ if (!db) {
     console.error('Failed to initialize Firebase. Exiting bot process.');
     process.exit(1);
 }
-
-// Removed all client-side Firebase config and related checks
-// const firebaseClientConfig = { ... };
-// const requiredClientConfig = [ ... ];
-// const missingConfig = ...;
-// if (missingConfig.length > 0) { ... }
-// const firebaseApp = initializeApp(firebaseClientConfig);
-// const auth = getAuth(firebaseApp);
-// (async () => { ... })(); // Removed client-side auth as well
 
 const client = new Client({
     intents: [
@@ -81,6 +69,6 @@ client.on('interactionCreate', async (interaction) => {
     await commandHandler.handleSlashCommand(interaction, coinManager, client);
 });
 
-keepAlive();
+keepAlive(); // Now keepAlive is correctly imported as a function
 
 client.login(process.env.DISCORD_BOT_TOKEN);
