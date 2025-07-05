@@ -113,22 +113,29 @@ async function handleSlashCommand(interaction, coinManager, client) {
     }
 
     try {
-        // Defer reply here, for ALL slash commands
+        // Attempt to defer reply immediately. This is the first and fastest action.
         // Determine if the command should be ephemeral by default
-        const ephemeralDefault = ['bank_deposit', 'bank_withdraw'].includes(interaction.commandName); // Example: Make these ephemeral
+        const ephemeralDefault = ['bank_deposit', 'bank_withdraw'].includes(interaction.commandName);
         await interaction.deferReply({ flags: ephemeralDefault ? MessageFlags.Ephemeral : 0 });
 
         // Now, the individual command's slashExecute method should NOT call deferReply.
         // It should directly use interaction.followUp() for all its responses.
         await command.slashExecute(interaction, coinManager, client);
     } catch (error) {
-        console.error(`Error executing slash command /${interaction.commandName}:`, error);
-        if (interaction.replied || interaction.deferred) {
-            await interaction.followUp({ content: `There was an error trying to execute that command: \`${error.message}\``, flags: MessageFlags.Ephemeral })
-                .catch(e => console.error("Failed to send followUp error message:", e));
+        // This catch block will primarily handle errors from deferReply itself,
+        // or unexpected synchronous errors before command.slashExecute is awaited.
+        console.error(`Error in handleSlashCommand for /${interaction.commandName}:`, error);
+
+        // Only attempt to reply if the interaction hasn't been replied to or deferred yet.
+        // This prevents the "Interaction has already been acknowledged" error.
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: `An unexpected error occurred: ${error.message}`, flags: MessageFlags.Ephemeral })
+                .catch(e => console.error("Failed to send initial error reply:", e));
         } else {
-            await interaction.reply({ content: `There was an error trying to execute that command: \`${error.message}\``, flags: MessageFlags.Ephemeral })
-                .catch(e => console.error("Failed to send reply error message:", e));
+            // If it was already deferred/replied, try to follow up if possible,
+            // but the original error might still be from a timeout.
+            await interaction.followUp({ content: `An error occurred during command execution: ${error.message}`, flags: MessageFlags.Ephemeral })
+                .catch(e => console.error("Failed to send followUp error message:", e));
         }
     }
 }
