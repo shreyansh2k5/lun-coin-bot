@@ -1,5 +1,5 @@
 // src/commands/commandHandler.js
-const { Collection, MessageFlags } = require('discord.js'); // Import Collection and MessageFlags
+const { Collection, MessageFlags } = require('discord.js');
 
 // Import all command modules
 const pingCommand = require('./ping');
@@ -14,20 +14,17 @@ const addCoinsCommand = require('./add_coins');
 const deductCoinsCommand = require('./deduct_coins');
 const leaderboardCommand = require('./leaderboard');
 const profileCommand = require('./profile');
-const raidCommand = require('./raid'); // NEW: Re-add import
-const bankDepositCommand = require('./bank_deposit'); // NEW: Re-add import
-const bankWithdrawCommand = require('./bank_withdraw'); // NEW: Re-add import
+const raidCommand = require('./raid');
+const bankDepositCommand = require('./bank_deposit');
+const bankWithdrawCommand = require('./bank_withdraw');
 
 // Maps to store commands, accessible by their name
 const prefixCommands = new Collection();
-const slashCommands = new Collection(); // Use Collection for slash commands as well for consistent lookup
-const slashCommandsData = []; // Array to hold data for Discord API registration
+const slashCommands = new Collection();
+const slashCommandsData = [];
 
 /**
  * Registers a command with the handler.
- * Commands must have a 'name' property.
- * If they have 'prefixExecute', they are registered as prefix commands.
- * If they have 'slashExecute', and 'slashCommandData', they are registered as slash commands.
  * @param {object} command The command object.
  */
 function registerCommand(command) {
@@ -42,41 +39,28 @@ function registerCommand(command) {
 
     if (typeof command.slashExecute === 'function' && command.slashCommandData) {
         slashCommands.set(command.name, command);
-        slashCommandsData.push(command.slashCommandData.toJSON()); // Store JSON data for API registration
+        slashCommandsData.push(command.slashCommandData.toJSON());
     }
 }
 
 /**
  * Registers all available commands.
- * This function should be called once when the bot is ready.
  * @param {import('../services/coinManager')} coinManager The CoinManager instance.
  * @param {import('discord.js').Client} client The Discord client instance.
  */
 function registerAllCommands(coinManager, client) {
-    // Register core commands
-    registerCommand(pingCommand);
+    registerCommand(pingCommand()); // Ping doesn't need coinManager
     registerCommand(balanceCommand(coinManager));
     registerCommand(giveCommand(coinManager, client));
-    // Pass all command maps/data to help command for dynamic listing
-    registerCommand(helpCommand(prefixCommands, slashCommandsData, slashCommands)); // Pass slashCommands map too
-
-    // Register new game/activity commands
+    registerCommand(helpCommand(prefixCommands, slashCommandsData, slashCommands));
     registerCommand(flipCommand(coinManager));
     registerCommand(rollCommand(coinManager));
     registerCommand(dailyCommand(coinManager));
     registerCommand(begCommand(coinManager));
-
-    // Register admin commands
     registerCommand(addCoinsCommand(coinManager, client));
     registerCommand(deductCoinsCommand(coinManager, client));
-
-    // Register leaderboard command
     registerCommand(leaderboardCommand(coinManager, client));
-
-    // Register NEW profile command
     registerCommand(profileCommand(coinManager));
-
-    // Re-register Raid and Bank commands
     registerCommand(raidCommand(coinManager));
     registerCommand(bankDepositCommand(coinManager));
     registerCommand(bankWithdrawCommand(coinManager));
@@ -97,8 +81,6 @@ async function handlePrefixCommand(commandName, message, args, coinManager, clie
     const command = prefixCommands.get(commandName);
 
     if (!command) {
-        // Optionally, send a message if command is not found
-        // message.channel.send(`Sorry, I don't recognize the command \`$${commandName}\`.`);
         return;
     }
 
@@ -106,7 +88,6 @@ async function handlePrefixCommand(commandName, message, args, coinManager, clie
         await command.prefixExecute(message, args, coinManager, client);
     } catch (error) {
             console.error(`Error executing prefix command $${commandName}:`, error);
-            // Check if the message has already been replied to or deleted to avoid errors
             if (!message.deleted) {
                 message.channel.send(`There was an error trying to execute that command: \`${error.message}\``)
                     .catch(e => console.error("Failed to send error message:", e));
@@ -125,20 +106,23 @@ async function handleSlashCommand(interaction, coinManager, client) {
 
     if (!command) {
         console.error(`No command matching ${interaction.commandName} was found.`);
-        // If interaction is not yet replied/deferred, send an ephemeral error
         if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: 'Sorry, that command was not found.', ephemeral: true }).catch(e => console.error("Failed to send command not found error:", e));
+            await interaction.reply({ content: 'Sorry, that command was not found.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send command not found error:", e));
         }
         return;
     }
 
     try {
-        // IMPORTANT: The individual command's slashExecute method is now responsible
-        // for calling interaction.deferReply() or interaction.reply()
+        // Defer reply here, for ALL slash commands
+        // Determine if the command should be ephemeral by default
+        const ephemeralDefault = ['bank_deposit', 'bank_withdraw'].includes(interaction.commandName); // Example: Make these ephemeral
+        await interaction.deferReply({ flags: ephemeralDefault ? MessageFlags.Ephemeral : 0 });
+
+        // Now, the individual command's slashExecute method should NOT call deferReply.
+        // It should directly use interaction.followUp() for all its responses.
         await command.slashExecute(interaction, coinManager, client);
     } catch (error) {
         console.error(`Error executing slash command /${interaction.commandName}:`, error);
-        // Check if the interaction has already been replied to or deferred
         if (interaction.replied || interaction.deferred) {
             await interaction.followUp({ content: `There was an error trying to execute that command: \`${error.message}\``, flags: MessageFlags.Ephemeral })
                 .catch(e => console.error("Failed to send followUp error message:", e));
