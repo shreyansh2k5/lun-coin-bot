@@ -16,9 +16,10 @@ module.exports = (coinManager) => ({
         .setName('bank_withdraw')
         .setDescription('Deactivate safe mode. You can now be raided and raid others.'),
 
-    async executeCommand(userId, username, replyFunction) {
+    // Changed replyFunction to interaction for direct access
+    async executeCommand(userId, username, interaction) {
         // Defer reply first
-        await replyFunction.defer({ ephemeral: true });
+        await interaction.deferReply({ ephemeral: true });
 
         const now = Date.now();
         const lastUsed = bankToggleCooldowns.get(userId);
@@ -36,27 +37,28 @@ module.exports = (coinManager) => ({
             if (seconds > 0) timeString += `${seconds} second(s) `;
             timeString = timeString.trim();
 
-            return replyFunction.followUp({ content: `You can change your safe mode status again in ${timeString}.`, flags: MessageFlags.Ephemeral });
+            return interaction.followUp({ content: `You can change your safe mode status again in ${timeString}.`, flags: MessageFlags.Ephemeral });
         }
 
         try {
             const userData = await coinManager.getUserData(userId);
             if (!userData.isBanked) {
-                return replyFunction.followUp({ content: `${username}, you are not currently in safe mode.`, flags: MessageFlags.Ephemeral });
+                return interaction.followUp({ content: `${username}, you are not currently in safe mode.`, flags: MessageFlags.Ephemeral });
             }
 
             await coinManager.setBankedStatus(userId, false);
             bankToggleCooldowns.set(userId, now); // Set cooldown
 
-            await replyFunction.followUp({ content: `🔓 **${username}**, you have deactivated safe mode. You can now be raided and raid others.`, flags: MessageFlags.Ephemeral });
+            await interaction.followUp({ content: `🔓 **${username}**, you have deactivated safe mode. You can now be raided and raid others.`, flags: MessageFlags.Ephemeral });
 
         } catch (error) {
             console.error(`Error in bank_withdraw command for ${username}:`, error);
-            await replyFunction.followUp({ content: `Sorry ${username}, an error occurred while deactivating safe mode: ${error.message}`, flags: MessageFlags.Ephemeral });
+            await interaction.followUp({ content: `Sorry ${username}, an error occurred while deactivating safe mode: ${error.message}`, flags: MessageFlags.Ephemeral });
         }
     },
 
     async prefixExecute(message, args) {
+        // For simplicity, this command will be slash-only.
         return message.channel.send('The `$bank_withdraw` command is only available as a slash command (`/bank_withdraw`).');
     },
 
