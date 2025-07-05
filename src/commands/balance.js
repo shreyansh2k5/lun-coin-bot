@@ -18,7 +18,7 @@ module.exports = (coinManager) => ({
         const username = message.author.username;
         try {
             const balance = await coinManager.getBalance(userId);
-            await message.channel.send(`💰 ${username}, your current balance is **${balance}** coins.`); // Bold coins
+            await message.channel.send(`💰 ${username}, your current balance is **${balance}** coins.`);
         } catch (error) {
             console.error(`Error in $balance command for ${username}:`, error);
             await message.channel.send(`Sorry ${username}, there was an error fetching your balance: ${error.message}`);
@@ -26,27 +26,14 @@ module.exports = (coinManager) => ({
     },
 
     async slashExecute(interaction) {
-        try {
-            // Defer reply first to prevent "Unknown interaction" error
-            // Use flags: 0 for public replies
-            await interaction.deferReply({ flags: 0 });
-        } catch (deferError) {
-            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
-            if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
-            }
-            return; // Stop execution if deferral failed
-        }
-
+        // DEFER REPLY IS REMOVED FROM HERE - IT'S NOW IN COMMANDHANDLER.JS
         const userId = interaction.user.id;
         const username = interaction.user.username;
         try {
             const balance = await coinManager.getBalance(userId);
-            // After deferring, use followUp
             await interaction.followUp(`💰 ${username}, your current balance is **${balance}** coins.`);
         } catch (error) {
             console.error(`Error in /balance command for ${username}:`, error);
-            // After deferring, use followUp for errors too
             await interaction.followUp({ content: `Sorry ${username}, there was an error fetching your balance: ${error.message}`, flags: MessageFlags.Ephemeral });
         }
     },
