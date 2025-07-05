@@ -22,8 +22,7 @@ module.exports = (coinManager) => ({
             // Fetch coin data for the target user
             const userData = await coinManager.getUserData(targetId);
             const coins = userData.coins;
-            const bankedCoins = userData.bankedCoins;
-            const isBanked = userData.isBanked;
+            const isBanked = userData.isBanked; // Get only the isBanked status
 
             // Get roles if the command was run in a guild context and targetMember is available
             let rolesString = 'No roles found.';
@@ -42,9 +41,8 @@ module.exports = (coinManager) => ({
                 .setTitle(`${targetUsername}'s Profile`)
                 .setThumbnail(targetAvatarURL) // Set user's avatar as thumbnail
                 .addFields(
-                    { name: '💰 Main Balance', value: `**${coins}** coins`, inline: true },
-                    { name: '🏦 Bank Balance', value: `**${bankedCoins}** coins`, inline: true },
-                    { name: '🔒 Banked Status', value: isBanked ? 'Safe (Cannot be raided)' : 'Vulnerable (Can be raided)', inline: false },
+                    { name: '💰 Balance', value: `**${coins}** coins`, inline: true }, // Only main balance
+                    { name: '🔒 Safe Mode Status', value: isBanked ? 'Active (Cannot be raided)' : 'Inactive (Can be raided)', inline: true }, // Changed field name
                     { name: '🎭 Server Roles', value: rolesString, inline: false }
                 )
                 .setTimestamp() // Adds a timestamp at the bottom
@@ -59,15 +57,13 @@ module.exports = (coinManager) => ({
     },
 
     async prefixExecute(message, args) {
-        // For prefix commands, if a user is mentioned, use that user. Otherwise, use the author.
         const targetUser = message.mentions.users.first() || message.author;
-        const targetMember = message.mentions.members.first() || message.member; // Get member for roles
+        const targetMember = message.mentions.members.first() || message.member;
 
         const targetId = targetUser.id;
         const targetUsername = targetUser.username;
-        const targetAvatarURL = targetUser.displayAvatarURL({ dynamic: true }); // Get animated avatars if available
+        const targetAvatarURL = targetUser.displayAvatarURL({ dynamic: true });
 
-        // Prefix commands don't use ephemeral replies in the same way as slash commands
         await this.executeCommand(targetId, targetUsername, targetAvatarURL, targetMember, (content, ephemeral) => {
             if (content.embeds) {
                 return message.channel.send({ embeds: content.embeds });
@@ -77,15 +73,14 @@ module.exports = (coinManager) => ({
     },
 
     async slashExecute(interaction) {
-        // Defer reply first to prevent "Unknown interaction" error
-        await interaction.deferReply({ ephemeral: false }); // Profile command should be public
+        await interaction.deferReply({ ephemeral: false });
 
         const targetUser = interaction.options.getUser('user') || interaction.user;
-        const targetMember = interaction.options.getMember('user') || interaction.member; // Get member for roles
+        const targetMember = interaction.options.getMember('user') || interaction.member;
 
         const targetId = targetUser.id;
         const targetUsername = targetUser.username;
-        const targetAvatarURL = targetUser.displayAvatarURL({ dynamic: true }); // Get animated avatars if available
+        const targetAvatarURL = targetUser.displayAvatarURL({ dynamic: true });
 
         await this.executeCommand(targetId, targetUsername, targetAvatarURL, targetMember, (content, ephemeral) => interaction.followUp({ content, embeds: content.embeds, flags: ephemeral ? MessageFlags.Ephemeral : 0 }));
     },
