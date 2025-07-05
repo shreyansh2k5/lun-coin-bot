@@ -1,0 +1,66 @@
+// src/commands/bank_withdraw.js
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { BANK_TOGGLE_COOLDOWN_MS } = require('../config/gameConfig');
+
+const bankToggleCooldowns = new Map(); // Stores userId -> lastUsedTimestamp for bank toggle (same cooldown as deposit)
+
+/**
+ * Factory function to create the bank_withdraw command.
+ * @param {import('../services/coinManager')} coinManager The CoinManager instance.
+ * @returns {object} The command object.
+ */
+module.exports = (coinManager) => ({
+    name: 'bank_withdraw',
+    description: 'Deactivate safe mode. You can now be raided and raid others.',
+    slashCommandData: new SlashCommandBuilder()
+        .setName('bank_withdraw')
+        .setDescription('Deactivate safe mode. You can now be raided and raid others.'),
+
+    async executeCommand(userId, username, replyFunction) {
+        // Defer reply first
+        await replyFunction.defer({ ephemeral: true });
+
+        const now = Date.now();
+        const lastUsed = bankToggleCooldowns.get(userId);
+
+        // Cooldown check for bank toggle
+        if (lastUsed && (now - lastUsed < BANK_TOGGLE_COOLDOWN_MS)) {
+            const timeLeft = BANK_TOGGLE_COOLDOWN_MS - (now - lastUsed);
+            const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+            const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+            let timeString = '';
+            if (hours > 0) timeString += `${hours} hour(s) `;
+            if (minutes > 0) timeString += `${minutes} minute(s) `;
+            if (seconds > 0) timeString += `${seconds} second(s) `;
+            timeString = timeString.trim();
+
+            return replyFunction.followUp({ content: `You can change your safe mode status again in ${timeString}.`, flags: MessageFlags.Ephemeral });
+        }
+
+        try {
+            const userData = await coinManager.getUserData(userId);
+            if (!userData.isBanked) {
+                return replyFunction.followUp({ content: `${username}, you are not currently in safe mode.`, flags: MessageFlags.Ephemeral });
+            }
+
+            await coinManager.setBankedStatus(userId, false);
+            bankToggleCooldowns.set(userId, now); // Set cooldown
+
+            await replyFunction.followUp({ content: `🔓 **${username}**, you have deactivated safe mode. You can now be raided and raid others.`, flags: MessageFlags.Ephemeral });
+
+        } catch (error) {
+            console.error(`Error in bank_withdraw command for ${username}:`, error);
+            await replyFunction.followUp({ content: `Sorry ${username}, an error occurred while deactivating safe mode: ${error.message}`, flags: MessageFlags.Ephemeral });
+        }
+    },
+
+    async prefixExecute(message, args) {
+        return message.channel.send('The `$bank_withdraw` command is only available as a slash command (`/bank_withdraw`).');
+    },
+
+    async slashExecute(interaction) {
+        await this.executeCommand(interaction.user.id, interaction.user.username, interaction);
+    },
+});
