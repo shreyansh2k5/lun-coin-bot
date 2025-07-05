@@ -85,6 +85,7 @@ module.exports = (coinManager, client) => ({
      * @param {import('discord.js').ChatInputCommandInteraction} interaction The interaction object.
      */
     async slashExecute(interaction) {
+        await interaction.deferReply({ ephemeral: false });
         const senderId = interaction.user.id;
         const senderUsername = interaction.user.username;
         const targetUser = interaction.options.getUser('target');
