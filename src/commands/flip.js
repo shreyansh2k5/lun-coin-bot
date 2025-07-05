@@ -1,6 +1,6 @@
 // src/commands/flip.js
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { FLIP_WIN_CHANCE } = require('../config/gameConfig'); //
+const { FLIP_WIN_CHANCE } = require('../config/gameConfig');
 
 /**
  * Factory function to create the flip command.
@@ -31,19 +31,19 @@ module.exports = (coinManager) => ({
         try {
             const balance = await coinManager.getBalance(userId);
             if (balance < amount) {
-                return message.channel.send(`${username}, you only have **${balance}** 💰. You cannot bet **${amount}** 💰.`); // Bold coins
+                return message.channel.send(`${username}, you only have **${balance}** 💰. You cannot bet **${amount}** 💰.`);
             }
 
-            const win = Math.random() < FLIP_WIN_CHANCE; // 50% chance
+            const win = Math.random() < FLIP_WIN_CHANCE;
             let newBalance;
             let resultMessage;
 
             if (win) {
                 newBalance = await coinManager.addCoins(userId, amount);
-                resultMessage = `🎉 ${username}, you won the coin flip and doubled your bet! You gained **${amount}** 💰. Your new balance is **${newBalance}** 💰.`; // Bold coins
+                resultMessage = `🎉 ${username}, you won the coin flip and doubled your bet! You gained **${amount}** 💰. Your new balance is **${newBalance}** 💰.`;
             } else {
                 newBalance = await coinManager.removeCoins(userId, amount);
-                resultMessage = `💔 ${username}, you lost the coin flip and lost **${amount}** 💰. Your new balance is **${newBalance}** 💰.`; // Bold coins
+                resultMessage = `💔 ${username}, you lost the coin flip and lost **${amount}** 💰. Your new balance is **${newBalance}** 💰.`;
             }
             await message.channel.send(resultMessage);
 
@@ -54,19 +54,7 @@ module.exports = (coinManager) => ({
     },
 
     async slashExecute(interaction) {
-    try {
-        // Defer reply first to prevent "Unknown interaction" error
-        // Use flags: 0 for public replies, or MessageFlags.Ephemeral for private replies
-        await interaction.deferReply({ flags: 0 }); // Adjust flags based on whether the command's primary response should be public or private
-    } catch (deferError) {
-        console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
-        // If defer fails, try to reply ephemerally immediately as a last resort
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
-        }
-        return; // Stop execution if deferral failed
-    }
-
+        // DEFER REPLY IS REMOVED FROM HERE - IT'S NOW IN COMMANDHANDLER.JS
         const userId = interaction.user.id;
         const username = interaction.user.username;
         const amount = interaction.options.getInteger('amount');
@@ -74,19 +62,19 @@ module.exports = (coinManager) => ({
         try {
             const balance = await coinManager.getBalance(userId);
             if (balance < amount) {
-                return interaction.followUp({ content: `${username}, you only have **${balance}** 💰. You cannot bet **${amount}** 💰.`, flags: MessageFlags.Ephemeral }); // Bold coins
+                return interaction.followUp({ content: `${username}, you only have **${balance}** 💰. You cannot bet **${amount}** 💰.`, flags: MessageFlags.Ephemeral });
             }
 
-            const win = Math.random() < FLIP_WIN_CHANCE; // 50% chance
+            const win = Math.random() < FLIP_WIN_CHANCE;
             let newBalance;
             let resultMessage;
 
             if (win) {
                 newBalance = await coinManager.addCoins(userId, amount);
-                resultMessage = `🎉 ${username}, you won the coin flip and doubled your bet! You gained **${amount}** 💰. Your new balance is **${newBalance}** 💰.`; // Bold coins
+                resultMessage = `🎉 ${username}, you won the coin flip and doubled your bet! You gained **${amount}** 💰. Your new balance is **${newBalance}** 💰.`;
             } else {
                 newBalance = await coinManager.removeCoins(userId, amount);
-                resultMessage = `💔 ${username}, you lost the coin flip and lost **${amount}** 💰. Your new balance is **${newBalance}** 💰.`; // Bold coins
+                resultMessage = `💔 ${username}, you lost the coin flip and lost **${amount}** 💰. Your new balance is **${newBalance}** 💰.`;
             }
             await interaction.followUp(resultMessage);
 
