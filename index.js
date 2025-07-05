@@ -1,6 +1,6 @@
 // index.js
 require('dotenv').config(); // Load environment variables from .env file
-const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js'); // Removed ActivityType from here
+const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
 const { initializeApp } = require('firebase/app');
 const { getFirestore } = require('firebase/firestore');
 const { getAuth, signInAnonymously, signInWithCustomToken } = require('firebase/auth');
@@ -9,7 +9,7 @@ const CoinManager = require('./src/services/coinManager');
 const commandHandler = require('./src/commands/commandHandler');
 const keepAlive = require('./src/utils/keepAlive');
 const { setBotActivity } = require('./src/utils/richPresence'); // Import the new richPresence utility
-const { ActivityType } = require('discord.js'); // Re-import ActivityType for use here
+const { ActivityType } = require('discord.js'); // Keep ActivityType import if needed elsewhere, otherwise it can be removed
 
 let serviceAccount;
 try {
@@ -88,8 +88,8 @@ client.once('ready', async () => {
     console.log(`Logged in as ${client.user.tag}!`);
     console.log('Bot is online and ready.');
 
-    // Set the bot's activity using the new utility function
-    setBotActivity(client.user, 'with coins', ActivityType.Playing);
+    // Call the utility function without arguments to use its defaults
+    setBotActivity(client.user);
 
     commandHandler.registerAllCommands(coinManager, client);
 
