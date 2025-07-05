@@ -70,6 +70,7 @@ module.exports = (coinManager, client) => ({
     },
 
     async slashExecute(interaction) {
+        await interaction.deferReply({ ephemeral: false });
         const executorId = interaction.user.id;
         const targetUser = interaction.options.getUser('target');
         const amount = interaction.options.getInteger('amount');
