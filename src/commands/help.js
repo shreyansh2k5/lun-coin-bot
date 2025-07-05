@@ -22,6 +22,7 @@ module.exports = (prefixCommandsMap, slashCommandsDataArray, slashCommandsMap) =
     },
 
     async slashExecute(interaction) {
+        await interaction.deferReply({ ephemeral: false });
         const helpEmbed = this.generateHelpEmbed(prefixCommandsMap, slashCommandsDataArray, slashCommandsMap);
         await interaction.followUp({ embeds: [helpEmbed], flags: 0 });
     },
