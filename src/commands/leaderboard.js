@@ -1,5 +1,5 @@
 // src/commands/leaderboard.js
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js'); // Import MessageFlags
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 
 /**
  * Factory function to create the leaderboard command.
@@ -9,10 +9,10 @@ const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js'
  */
 module.exports = (coinManager, client) => ({
     name: 'leaderboard',
-    description: 'Shows the top coin holders on the server.',
+    description: 'Shows the top 10 richest users.',
     slashCommandData: new SlashCommandBuilder()
         .setName('leaderboard')
-        .setDescription('Shows the top coin holders on the server.'),
+        .setDescription('Shows the top 10 richest users.'),
 
     async executeCommand(replyFunction) {
         try {
@@ -22,49 +22,68 @@ module.exports = (coinManager, client) => ({
             allUsers.sort((a, b) => b.coins - a.coins);
 
             // Get top 10 users
-            const topUsers = allUsers.slice(0, 10);
+            const top10Users = allUsers.slice(0, 10);
 
-            const leaderboardEmbed = new EmbedBuilder()
-                .setColor(0xFFA500) // Orange color for leaderboard
-                .setTitle('🏆 __Top Coin Holders__ 🏆')
-                .setDescription('Here are the richest users in the coin system!')
-                .setTimestamp();
-
-            if (topUsers.length === 0) {
-                leaderboardEmbed.setDescription('No users found in the leaderboard yet. Start playing!');
-            } else {
-                let leaderboardText = '';
-                for (let i = 0; i < topUsers.length; i++) {
-                    const user = topUsers[i];
-                    // Fetch user tag from Discord if available, otherwise use ID
-                    let userTag = user.userId;
-                    try {
-                        const discordUser = await client.users.fetch(user.userId);
-                        userTag = discordUser.username;
-                    } catch (e) {
-                        // User not found or bot doesn't have access to fetch
-                        userTag = `Unknown User (${user.userId.substring(0, 5)}...)`;
-                    }
-                    leaderboardText += `**${i + 1}.** ${userTag}: **${user.coins}** 💰\n`;
-                }
-                leaderboardEmbed.addFields({ name: 'Rankings', value: leaderboardText, inline: false });
+            if (top10Users.length === 0) {
+                return replyFunction('The leaderboard is currently empty!', false);
             }
 
-            // Pass flags: 0 for public reply
-            await replyFunction({ embeds: [leaderboardEmbed] }, false); // Pass false for ephemeral
+            const leaderboardEmbed = new EmbedBuilder()
+                .setColor(0xFFA500) // Orange color
+                .setTitle('💰 Top 10 Richest Users 💰')
+                .setDescription('Here are the users with the most coins!')
+                .setTimestamp()
+                .setFooter({ text: 'Lun Coin Bot Leaderboard' });
+
+            for (let i = 0; i < top10Users.length; i++) {
+                const user = top10Users[i];
+                // Fetch Discord user object to get username
+                const discordUser = await client.users.fetch(user.userId).catch(() => null); // Catch if user not found
+                const username = discordUser ? discordUser.username : `Unknown User (${user.userId})`;
+
+                leaderboardEmbed.addFields({
+                    name: `#${i + 1} ${username}`,
+                    value: `**${user.coins}** coins`,
+                    inline: false,
+                });
+            }
+
+            await replyFunction({ embeds: [leaderboardEmbed] }, false); // Send the embed, not ephemeral
 
         } catch (error) {
-            console.error('Error generating leaderboard:', error);
-            await replyFunction({ content: 'An error occurred while fetching the leaderboard.', flags: MessageFlags.Ephemeral }, true); // Pass true for ephemeral
+            console.error('Error fetching leaderboard:', error);
+            await replyFunction(`Sorry, there was an error fetching the leaderboard: ${error.message}`, true); // Ephemeral error
         }
     },
 
-    async prefixExecute(message, args, coinManager, client) {
-        await this.executeCommand((content) => message.channel.send(content));
+    async prefixExecute(message, args) {
+        // Prefix commands don't use ephemeral replies in the same way as slash commands
+        await this.executeCommand((content, ephemeral) => {
+            if (content.embeds) {
+                return message.channel.send({ embeds: content.embeds });
+            }
+            return message.channel.send(content);
+        });
     },
 
     async slashExecute(interaction) {
-        // The replyFunction now receives two arguments: content and ephemeral boolean
-        await this.executeCommand((content, ephemeral) => interaction.followUp({ content, flags: ephemeral ? MessageFlags.Ephemeral : 0 }));
+        try {
+            // Defer reply first
+            await interaction.deferReply({ flags: 0 }); // Leaderboard should be public
+        } catch (deferError) {
+            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
+            }
+            return;
+        }
+
+        // Pass interaction itself as replyFunction, so executeCommand can use defer/followUp
+        await this.executeCommand((content, ephemeral) => {
+            if (content.embeds) {
+                return interaction.followUp({ embeds: content.embeds, flags: ephemeral ? MessageFlags.Ephemeral : 0 });
+            }
+            return interaction.followUp({ content, flags: ephemeral ? MessageFlags.Ephemeral : 0 });
+        });
     },
 });
