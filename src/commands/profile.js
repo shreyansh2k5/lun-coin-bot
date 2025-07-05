@@ -17,12 +17,13 @@ module.exports = (coinManager) => ({
                 .setDescription('The user whose profile you want to view (defaults to yourself)')
                 .setRequired(false)), // Not required, defaults to self
 
-    async executeCommand(targetId, targetUsername, targetAvatarURL, targetMember, replyFunction) {
+    // Changed replyFunction to interaction (for slash) or message (for prefix) for direct use
+    async executeCommand(targetId, targetUsername, targetAvatarURL, targetMember, interactionOrMessage) {
         try {
             // Fetch coin data for the target user
             const userData = await coinManager.getUserData(targetId);
             const coins = userData.coins;
-            const isBanked = userData.isBanked; // Get only the isBanked status
+            const isBanked = userData.isBanked;
 
             // Get roles if the command was run in a guild context and targetMember is available
             let rolesString = 'No roles found.';
@@ -48,11 +49,21 @@ module.exports = (coinManager) => ({
                 .setTimestamp() // Adds a timestamp at the bottom
                 .setFooter({ text: 'Lun Coin Bot Profile' }); // Footer text
 
-            await replyFunction({ embeds: [profileEmbed] }, false); // Send the embed, not ephemeral
+            // Determine if it's an interaction or a message and reply accordingly
+            if (interactionOrMessage.followUp) { // It's an interaction
+                await interactionOrMessage.followUp({ embeds: [profileEmbed] });
+            } else { // It's a message
+                await interactionOrMessage.channel.send({ embeds: [profileEmbed] });
+            }
 
         } catch (error) {
             console.error(`Error in profile command for user ${targetId}:`, error);
-            await replyFunction(`Sorry, there was an error fetching the profile: ${error.message}`, true); // Ephemeral error
+            // Determine if it's an interaction or a message and reply accordingly for errors
+            if (interactionOrMessage.followUp) { // It's an interaction
+                await interactionOrMessage.followUp({ content: `Sorry, there was an error fetching the profile: ${error.message}`, flags: MessageFlags.Ephemeral });
+            } else { // It's a message
+                await interactionOrMessage.channel.send(`Sorry, there was an error fetching the profile: ${error.message}`);
+            }
         }
     },
 
@@ -64,16 +75,13 @@ module.exports = (coinManager) => ({
         const targetUsername = targetUser.username;
         const targetAvatarURL = targetUser.displayAvatarURL({ dynamic: true });
 
-        await this.executeCommand(targetId, targetUsername, targetAvatarURL, targetMember, (content, ephemeral) => {
-            if (content.embeds) {
-                return message.channel.send({ embeds: content.embeds });
-            }
-            return message.channel.send(content);
-        });
+        // Pass the message object directly
+        await this.executeCommand(targetId, targetUsername, targetAvatarURL, targetMember, message);
     },
 
     async slashExecute(interaction) {
-        await interaction.deferReply({ ephemeral: false });
+        // Defer reply first to prevent "Unknown interaction" error
+        await interaction.deferReply({ ephemeral: false }); // Profile command should be public
 
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const targetMember = interaction.options.getMember('user') || interaction.member;
@@ -82,6 +90,7 @@ module.exports = (coinManager) => ({
         const targetUsername = targetUser.username;
         const targetAvatarURL = targetUser.displayAvatarURL({ dynamic: true });
 
-        await this.executeCommand(targetId, targetUsername, targetAvatarURL, targetMember, (content, ephemeral) => interaction.followUp({ content, embeds: content.embeds, flags: ephemeral ? MessageFlags.Ephemeral : 0 }));
+        // Pass the interaction object directly
+        await this.executeCommand(targetId, targetUsername, targetAvatarURL, targetMember, interaction);
     },
 });
