@@ -1,111 +1,129 @@
 // index.js
-// Load environment variables from .env file if running locally
-if (process.env.NODE_ENV !== 'production') {
-    require('dotenv').config();
-}
-
-// Import necessary modules
-const { Client, GatewayIntentBits, Partials, REST, Routes } = require('discord.js');
-const { initializeFirebase } = require('./src/config/firebaseConfig');
+require('dotenv').config(); // Load environment variables from .env file
+const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js'); // Removed ActivityType from here
+const { initializeApp } = require('firebase/app');
+const { getFirestore } = require('firebase/firestore');
+const { getAuth, signInAnonymously, signInWithCustomToken } = require('firebase/auth');
+const admin = require('firebase-admin');
 const CoinManager = require('./src/services/coinManager');
 const commandHandler = require('./src/commands/commandHandler');
-const { startKeepAliveServer } = require('./src/utils/keepAlive');
+const keepAlive = require('./src/utils/keepAlive');
+const { setBotActivity } = require('./src/utils/richPresence'); // Import the new richPresence utility
+const { ActivityType } = require('discord.js'); // Re-import ActivityType for use here
 
-// Define the command prefix
-const PREFIX = '$'; // Changed prefix to '$'
-
-// Initialize Firebase and get the Firestore DB instance
-const db = initializeFirebase();
-if (!db) {
-    console.error('Failed to initialize Firebase. Exiting.');
+let serviceAccount;
+try {
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+        throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.");
+    }
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+    console.log('Firebase Service Account Key parsed successfully from environment variable.');
+} catch (error) {
+    console.error('Error parsing FIREBASE_SERVICE_ACCOUNT_KEY:', error.message);
+    console.error('Please ensure FIREBASE_SERVICE_ACCOUNT_KEY is a valid JSON string of your service account key file.');
     process.exit(1);
 }
-const coinManager = new CoinManager(db);
 
-// Create a new Discord client instance
+try {
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+    console.log('Firebase Admin SDK initialized successfully!');
+} catch (error) {
+    console.error('Error initializing Firebase Admin SDK:', error);
+    process.exit(1);
+}
+
+const firebaseClientConfig = {
+    apiKey: process.env.FIREBASE_API_KEY,
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.FIREBASE_APP_ID,
+    measurementId: process.env.FIREBASE_MEASUREMENT_ID
+};
+
+const requiredClientConfig = [
+    'FIREBASE_API_KEY', 'FIREBASE_AUTH_DOMAIN', 'FIREBASE_PROJECT_ID',
+    'FIREBASE_STORAGE_BUCKET', 'FIREBASE_MESSAGING_SENDER_ID', 'FIREBASE_APP_ID'
+];
+const missingConfig = requiredClientConfig.filter(key => !process.env[key]);
+
+if (missingConfig.length > 0) {
+    console.error(`Missing Firebase client environment variables: ${missingConfig.join(', ')}. Please add them to your Render environment.`);
+    process.exit(1);
+}
+
+const firebaseApp = initializeApp(firebaseClientConfig);
+const db = getFirestore(firebaseApp);
+const auth = getAuth(firebaseApp);
+
+(async () => {
+    try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+            console.log('Signed in with custom token!');
+        } else {
+            await signInAnonymously(auth);
+            console.log('Signed in anonymously!');
+        }
+    } catch (error) {
+        console.error('Firebase authentication failed:', error);
+        process.exit(1);
+    }
+})();
+
 const client = new Client({
     intents: [
-        GatewayIntentBits.Guilds,           // Required for guild-related events (e.g., slash commands)
-        GatewayIntentBits.GuildMessages,    // Required for message-related events
-        GatewayIntentBits.MessageContent,   // REQUIRED to read message content (enable in Discord Dev Portal)
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
     ],
-    partials: [Partials.Channel, Partials.Message] // Recommended for partial data handling
 });
 
-// Event listener for when the bot is ready
+const coinManager = new CoinManager(db);
+
 client.once('ready', async () => {
     console.log(`Logged in as ${client.user.tag}!`);
     console.log('Bot is online and ready.');
 
-    // Register all commands and get slash command data
+    // Set the bot's activity using the new utility function
+    setBotActivity(client.user, 'with coins', ActivityType.Playing);
+
     commandHandler.registerAllCommands(coinManager, client);
-    const slashCommandsData = commandHandler.getSlashCommandsData();
 
-    // Register slash commands globally (for simplicity, guild-specific is faster for testing)
-    if (slashCommandsData.length > 0) {
-        const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
-        try {
-            console.log('Started refreshing application (/) commands.');
+    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
 
-            // Use client.application.id for global commands
-            await rest.put(
-                Routes.applicationCommands(client.user.id),
-                { body: slashCommandsData },
-            );
-
-            console.log('Successfully reloaded application (/) commands.');
-        } catch (error) {
-            console.error('Error refreshing application (/) commands:', error);
-        }
+    try {
+        console.log('Started refreshing application (/) commands.');
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: commandHandler.getSlashCommandsData() },
+        );
+        console.log('Successfully reloaded application (/) commands.');
+    } catch (error) {
+        console.error('Error registering slash commands:', error);
     }
 });
 
-// Event listener for incoming messages (for prefix commands)
-client.on('messageCreate', async message => {
-    // Ignore messages from bots to prevent infinite loops
+client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    // Check if the message starts with the prefix
-    if (!message.content.startsWith(PREFIX)) return;
+    const prefix = process.env.PREFIX || '$';
+    if (!message.content.startsWith(prefix)) return;
 
-    // Extract command name and arguments
-    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+    const args = message.content.slice(prefix.length).trim().split(/ +/);
     const commandName = args.shift().toLowerCase();
 
-    // Handle prefix commands
-    commandHandler.handlePrefixCommand(commandName, message, args, coinManager, client);
+    await commandHandler.handlePrefixCommand(commandName, message, args, coinManager, client);
 });
 
-// Event listener for interactions (for slash commands)
-client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand()) return;
-
-    // Handle slash commands
-    commandHandler.handleSlashCommand(interaction, coinManager, client);
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isCommand()) return;
+    await commandHandler.handleSlashCommand(interaction, coinManager, client);
 });
 
-// Log in to Discord with your bot token
-const botToken = process.env.DISCORD_BOT_TOKEN;
-if (!botToken) {
-    console.error('DISCORD_BOT_TOKEN environment variable is not set.');
-    process.exit(1);
-}
+keepAlive();
 
-client.login(botToken)
-    .catch(error => {
-        console.error('Failed to log in to Discord:', error);
-        process.exit(1);
-    });
-
-// --- Start Keep-Alive HTTP Server for Render ---
-const keepAliveServer = startKeepAliveServer();
-
-// Handle graceful shutdown
-process.on('SIGINT', () => {
-    console.log('Shutting down bot...');
-    client.destroy();
-    keepAliveServer.close(() => {
-        console.log('Keep-alive server closed.');
-        process.exit(0);
-    });
-});
+client.login(process.env.DISCORD_BOT_TOKEN);
