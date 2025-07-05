@@ -8,7 +8,7 @@ const { ActivityType } = require('discord.js');
  * @param {ActivityType} [activityType=ActivityType.Playing] Optional: The type of activity. Defaults to ActivityType.Playing.
  * @param {string} [url] Optional URL for streaming activity type.
  */
-function setBotActivity(clientUser, activityName = 'type $help to start', activityType = ActivityType.Playing, url = null) {
+function setBotActivity(clientUser, activityName = 'type $help to start', activityType = ActivityType.watching, url = null) {
     const options = { type: activityType };
     if (url && activityType === ActivityType.Streaming) {
         options.url = url;
