@@ -1,5 +1,5 @@
 // src/commands/leaderboard.js
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js'); // Import MessageFlags
 
 /**
  * Factory function to create the leaderboard command.
@@ -50,11 +50,12 @@ module.exports = (coinManager, client) => ({
                 leaderboardEmbed.addFields({ name: 'Rankings', value: leaderboardText, inline: false });
             }
 
-            await replyFunction({ embeds: [leaderboardEmbed] });
+            // Pass flags: 0 for public reply
+            await replyFunction({ embeds: [leaderboardEmbed] }, false); // Pass false for ephemeral
 
         } catch (error) {
             console.error('Error generating leaderboard:', error);
-            await replyFunction({ content: 'An error occurred while fetching the leaderboard.', flags: MessageFlags.Ephemeral });
+            await replyFunction({ content: 'An error occurred while fetching the leaderboard.', flags: MessageFlags.Ephemeral }, true); // Pass true for ephemeral
         }
     },
 
@@ -63,7 +64,7 @@ module.exports = (coinManager, client) => ({
     },
 
     async slashExecute(interaction) {
-        await interaction.deferReply({ ephemeral: false });
-        await this.executeCommand((content) => interaction.followUp(content));
+        // The replyFunction now receives two arguments: content and ephemeral boolean
+        await this.executeCommand((content, ephemeral) => interaction.followUp({ content, flags: ephemeral ? MessageFlags.Ephemeral : 0 }));
     },
 });
