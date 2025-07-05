@@ -1,9 +1,6 @@
 // src/commands/add_coins.js
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 
-// Get the bot owner ID from environment variables
-const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
-
 /**
  * Factory function to create the add_coins command.
  * @param {import('../services/coinManager')} coinManager The CoinManager instance.
@@ -12,10 +9,10 @@ const BOT_OWNER_ID = process.env.BOT_OWNER_ID;
  */
 module.exports = (coinManager, client) => ({
     name: 'add_coins',
-    description: '[ADMIN] Add coins to a user\'s balance.',
+    description: 'Adds coins to a user\'s balance (Admin only).',
     slashCommandData: new SlashCommandBuilder()
         .setName('add_coins')
-        .setDescription('[ADMIN] Add coins to a user\'s balance.')
+        .setDescription('Adds coins to a user\'s balance (Admin only).')
         .addUserOption(option =>
             option.setName('target')
                 .setDescription('The user to add coins to')
@@ -26,70 +23,53 @@ module.exports = (coinManager, client) => ({
                 .setRequired(true)
                 .setMinValue(1)),
 
-    // Helper function for owner check and execution
-    async executeAdminCommand(executorId, targetUser, amount, replyFunction) {
-        if (executorId !== BOT_OWNER_ID) {
-            return replyFunction('You do not have permission to use this command.', true); // Ephemeral for unauthorized attempts
-        }
-
-        if (!targetUser) {
-            return replyFunction('Please mention a valid user.', true);
-        }
-
-        if (isNaN(amount) || amount <= 0) {
-            return replyFunction('Invalid amount. Please provide a positive number.', true);
-        }
-
-        try {
-            const newBalance = await coinManager.addCoins(targetUser.id, amount);
-            await replyFunction(`✅ Added **${amount}** 💰 to ${targetUser.username}'s balance. New balance: **${newBalance}** 💰.`);
-        } catch (error) {
-            console.error(`Error adding coins to ${targetUser.username}:`, error);
-            await replyFunction(`An error occurred while adding coins: ${error.message}`, true);
-        }
-    },
-
-    async prefixExecute(message, args, coinManager, client) {
-        const executorId = message.author.id;
-        const mention = args[0];
-        const amount = parseInt(args[1]);
-
-        const targetId = mention ? mention.replace(/[^0-9]/g, '') : null;
-        let targetUser = null;
-        if (targetId) {
-            try {
-                targetUser = await client.users.fetch(targetId);
-            } catch (e) {
-                // User not found
+    async executeCommand(executorId, targetId, targetUsername, amount, interactionOrMessage) {
+        // Check if the executor is the bot owner (replace with your actual bot owner ID)
+        const botOwnerId = process.env.BOT_OWNER_ID;
+        if (executorId !== botOwnerId) {
+            if (interactionOrMessage.followUp) {
+                return interactionOrMessage.followUp({ content: 'You do not have permission to use this command.', flags: MessageFlags.Ephemeral });
+            } else {
+                return interactionOrMessage.channel.send('You do not have permission to use this command.');
             }
         }
 
-        await this.executeAdminCommand(executorId, targetUser, amount,
-            (content, ephemeral) => message.channel.send(content) // Prefix commands don't use ephemeral
-        );
+        try {
+            const newBalance = await coinManager.addCoins(targetId, amount);
+            const responseMessage = `💰 Successfully added **${amount}** coins to **${targetUsername}**. New balance: **${newBalance}** 💰.`;
+
+            if (interactionOrMessage.followUp) {
+                await interactionOrMessage.followUp(responseMessage);
+            } else {
+                await interactionOrMessage.channel.send(responseMessage);
+            }
+        } catch (error) {
+            console.error(`Error adding coins to ${targetUsername}:`, error);
+            const errorMessage = `Failed to add coins: ${error.message}`;
+            if (interactionOrMessage.followUp) {
+                await interactionOrMessage.followUp({ content: errorMessage, flags: MessageFlags.Ephemeral });
+            } else {
+                await interactionOrMessage.channel.send(errorMessage);
+            }
+        }
+    },
+
+    async prefixExecute(message, args) {
+        const targetUser = message.mentions.users.first();
+        const amount = parseInt(args[1]);
+
+        if (!targetUser || isNaN(amount) || amount <= 0) {
+            return message.channel.send('Usage: `$add_coins <@user> <amount>`. Amount must be a positive number.');
+        }
+
+        await this.executeCommand(message.author.id, targetUser.id, targetUser.username, amount, message);
     },
 
     async slashExecute(interaction) {
-    try {
-        // Defer reply first to prevent "Unknown interaction" error
-        // Use flags: 0 for public replies, or MessageFlags.Ephemeral for private replies
-        await interaction.deferReply({ flags: 0 }); // Adjust flags based on whether the command's primary response should be public or private
-    } catch (deferError) {
-        console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
-        // If defer fails, try to reply ephemerally immediately as a last resort
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
-        }
-        return; // Stop execution if deferral failed
-    }
-
-        const executorId = interaction.user.id;
+        // DEFER REPLY IS REMOVED FROM HERE - IT'S NOW IN COMMANDHANDLER.JS
         const targetUser = interaction.options.getUser('target');
         const amount = interaction.options.getInteger('amount');
 
-        await this.executeAdminCommand(executorId, targetUser, amount,
-            (content, ephemeral) => interaction.followUp({ content, flags: ephemeral ? MessageFlags.Ephemeral : 0 })
-        );
+        await this.executeCommand(interaction.user.id, targetUser.id, targetUser.username, amount, interaction);
     },
 });
-
