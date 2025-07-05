@@ -20,11 +20,9 @@ module.exports = (coinManager) => ({
                 .setDescription('The user you want to raid')
                 .setRequired(true)),
 
-    // Changed replyFunction to interaction for direct access
+    // interaction is passed directly here
     async executeCommand(raiderId, raiderUsername, targetUser, interaction) {
-        // Defer reply first to prevent "Unknown interaction" error
-        await interaction.deferReply({ ephemeral: false });
-
+        // Defer reply is already handled in slashExecute, so no need to defer here again
         const now = Date.now();
         const lastUsed = raidCooldowns.get(raiderId);
 
@@ -91,7 +89,7 @@ module.exports = (coinManager) => ({
                     return interaction.followUp(`You failed to raid ${targetUsername}, but you had no coins to lose!`);
                 }
                 await coinManager.transferCoins(raiderId, targetId, raidAmount);
-                resultMessage = `💔 **${raaderUsername}** failed to raid **${targetUsername}** and had to pay them **${raidAmount}** 💰!`;
+                resultMessage = `💔 **${raiderUsername}** failed to raid **${targetUsername}** and had to pay them **${raidAmount}** 💰!`;
             }
 
             raidCooldowns.set(raiderId, now); // Set cooldown for the raider
@@ -116,16 +114,26 @@ module.exports = (coinManager) => ({
     },
 
     async prefixExecute(message, args) {
-        // For simplicity, raid command will be slash-only as user mentions are more robust.
         return message.channel.send('The `$raid` command is only available as a slash command (`/raid`).');
     },
 
     async slashExecute(interaction) {
+        try {
+            // Defer reply first to prevent "Unknown interaction" error
+            await interaction.deferReply({ flags: 0 }); // Raid results should be public
+        } catch (deferError) {
+            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
+            }
+            return;
+        }
+
         const raiderId = interaction.user.id;
         const raiderUsername = interaction.user.username;
         const targetUser = interaction.options.getUser('target');
 
-        // Pass interaction itself as replyFunction, so executeCommand can use defer/followUp
+        // Pass interaction itself to executeCommand
         await this.executeCommand(raiderId, raiderUsername, targetUser, interaction);
     },
 });
