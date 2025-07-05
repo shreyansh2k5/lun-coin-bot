@@ -16,9 +16,10 @@ module.exports = (coinManager) => ({
         .setName('bank_deposit')
         .setDescription('Activate safe mode. You cannot be raided and cannot raid others for 24 hours.'),
 
-    async executeCommand(userId, username, replyFunction) {
+    // Changed replyFunction to interaction for direct access
+    async executeCommand(userId, username, interaction) {
         // Defer reply first
-        await replyFunction.defer({ ephemeral: true });
+        await interaction.deferReply({ ephemeral: true });
 
         const now = Date.now();
         const lastUsed = bankToggleCooldowns.get(userId);
@@ -36,28 +37,28 @@ module.exports = (coinManager) => ({
             if (seconds > 0) timeString += `${seconds} second(s) `;
             timeString = timeString.trim();
 
-            return replyFunction.followUp({ content: `You can change your safe mode status again in ${timeString}.`, flags: MessageFlags.Ephemeral });
+            return interaction.followUp({ content: `You can change your safe mode status again in ${timeString}.`, flags: MessageFlags.Ephemeral });
         }
 
         try {
             const userData = await coinManager.getUserData(userId);
             if (userData.isBanked) {
-                return replyFunction.followUp({ content: `${username}, you are already in safe mode!`, flags: MessageFlags.Ephemeral });
+                return interaction.followUp({ content: `${username}, you are already in safe mode!`, flags: MessageFlags.Ephemeral });
             }
 
             await coinManager.setBankedStatus(userId, true);
             bankToggleCooldowns.set(userId, now); // Set cooldown
 
-            await replyFunction.followUp({ content: `🏦 **${username}**, you have activated safe mode! You are now safe from raids and cannot raid others. This status will last until you use \`/withdraw\` or the cooldown expires.`, flags: MessageFlags.Ephemeral });
+            await interaction.followUp({ content: `🏦 **${username}**, you have activated safe mode! You are now safe from raids and cannot raid others. This status will last until you use \`/withdraw\` or the cooldown expires.`, flags: MessageFlags.Ephemeral });
 
         } catch (error) {
             console.error(`Error in bank_deposit command for ${username}:`, error);
-            await replyFunction.followUp({ content: `Sorry ${username}, an error occurred while activating safe mode: ${error.message}`, flags: MessageFlags.Ephemeral });
+            await interaction.followUp({ content: `Sorry ${username}, an error occurred while activating safe mode: ${error.message}`, flags: MessageFlags.Ephemeral });
         }
     },
 
     async prefixExecute(message, args) {
-        // No arguments for prefix, just activate safe mode
+        // For simplicity, this command will be slash-only.
         return message.channel.send('The `$bank_deposit` command is only available as a slash command (`/bank_deposit`).');
     },
 
