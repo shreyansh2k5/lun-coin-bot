@@ -1,78 +1,34 @@
 // index.js
 require('dotenv').config(); // Load environment variables from .env file
 const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
-const { initializeApp } = require('firebase/app');
-const { getFirestore } = require('firebase/firestore');
-const { getAuth, signInAnonymously, signInWithCustomToken } = require('firebase/auth');
-const admin = require('firebase-admin');
+// Removed client SDK imports: const { initializeApp } = require('firebase/app');
+// Removed client SDK imports: const { getFirestore } = require('firebase/firestore');
+// Removed client SDK imports: const { getAuth, signInAnonymously, signInWithCustomToken } = require('firebase/auth');
+const admin = require('firebase-admin'); // Keep admin SDK import
+const { initializeFirebase, getFirestore } = require('./src/config/firebaseConfig.js'); // Import from your original firebaseConfig.js
 const CoinManager = require('./src/services/coinManager');
 const commandHandler = require('./src/commands/commandHandler');
 const keepAlive = require('./src/utils/keepAlive');
 const { setBotActivity } = require('./src/utils/richPresence'); // Import the new richPresence utility
-const { ActivityType } = require('discord.js'); // Keep ActivityType import if needed elsewhere, otherwise it can be removed
+const { ActivityType } = require('discord.js'); // Keep ActivityType import for rich presence
 
-let serviceAccount;
-try {
-    if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-        throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.");
-    }
-    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-    console.log('Firebase Service Account Key parsed successfully from environment variable.');
-} catch (error) {
-    console.error('Error parsing FIREBASE_SERVICE_ACCOUNT_KEY:', error.message);
-    console.error('Please ensure FIREBASE_SERVICE_ACCOUNT_KEY is a valid JSON string of your service account key file.');
+// Initialize Firebase Admin SDK and get Firestore instance using your original method
+const db = initializeFirebase(); // Call your initializeFirebase function
+
+// Exit if Firebase initialization fails (db will be null)
+if (!db) {
+    console.error('Failed to initialize Firebase. Exiting bot process.');
     process.exit(1);
 }
 
-try {
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
-    console.log('Firebase Admin SDK initialized successfully!');
-} catch (error) {
-    console.error('Error initializing Firebase Admin SDK:', error);
-    process.exit(1);
-}
-
-const firebaseClientConfig = {
-    apiKey: process.env.FIREBASE_API_KEY,
-    authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.FIREBASE_APP_ID,
-    measurementId: process.env.FIREBASE_MEASUREMENT_ID
-};
-
-const requiredClientConfig = [
-    'FIREBASE_API_KEY', 'FIREBASE_AUTH_DOMAIN', 'FIREBASE_PROJECT_ID',
-    'FIREBASE_STORAGE_BUCKET', 'FIREBASE_MESSAGING_SENDER_ID', 'FIREBASE_APP_ID'
-];
-const missingConfig = requiredClientConfig.filter(key => !process.env[key]);
-
-if (missingConfig.length > 0) {
-    console.error(`Missing Firebase client environment variables: ${missingConfig.join(', ')}. Please add them to your Render environment.`);
-    process.exit(1);
-}
-
-const firebaseApp = initializeApp(firebaseClientConfig);
-const db = getFirestore(firebaseApp);
-const auth = getAuth(firebaseApp);
-
-(async () => {
-    try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            await signInWithCustomToken(auth, __initial_auth_token);
-            console.log('Signed in with custom token!');
-        } else {
-            await signInAnonymously(auth);
-            console.log('Signed in anonymously!');
-        }
-    } catch (error) {
-        console.error('Firebase authentication failed:', error);
-        process.exit(1);
-    }
-})();
+// Removed all client-side Firebase config and related checks
+// const firebaseClientConfig = { ... };
+// const requiredClientConfig = [ ... ];
+// const missingConfig = ...;
+// if (missingConfig.length > 0) { ... }
+// const firebaseApp = initializeApp(firebaseClientConfig);
+// const auth = getAuth(firebaseApp);
+// (async () => { ... })(); // Removed client-side auth as well
 
 const client = new Client({
     intents: [
@@ -82,14 +38,15 @@ const client = new Client({
     ],
 });
 
+// Initialize CoinManager with the Firestore database instance obtained from Admin SDK
 const coinManager = new CoinManager(db);
 
 client.once('ready', async () => {
     console.log(`Logged in as ${client.user.tag}!`);
     console.log('Bot is online and ready.');
 
-    // Call the utility function without arguments to use its defaults
-    setBotActivity(client.user);
+    // Set the bot's activity using the new utility function
+    setBotActivity(client.user); // Uses default 'type $help to start'
 
     commandHandler.registerAllCommands(coinManager, client);
 
