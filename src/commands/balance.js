@@ -26,8 +26,17 @@ module.exports = (coinManager) => ({
     },
 
     async slashExecute(interaction) {
-        // THIS IS THE CRUCIAL LINE TO ADD/ENSURE IS PRESENT
-        await interaction.deferReply({ ephemeral: false }); // Balance command should be public
+        try {
+            // Defer reply first to prevent "Unknown interaction" error
+            // Use flags: 0 for public replies
+            await interaction.deferReply({ flags: 0 });
+        } catch (deferError) {
+            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
+            }
+            return; // Stop execution if deferral failed
+        }
 
         const userId = interaction.user.id;
         const username = interaction.user.username;
