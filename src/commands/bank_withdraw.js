@@ -18,7 +18,7 @@ module.exports = (coinManager) => ({
 
     // interaction is passed directly here
     async executeCommand(userId, username, interaction) {
-        // Defer reply is already handled in slashExecute, so no need to defer here again
+        // Defer reply is already handled in slashExecute (by commandHandler), so no need to defer here again
         const now = Date.now();
         const lastUsed = bankToggleCooldowns.get(userId);
 
@@ -60,16 +60,7 @@ module.exports = (coinManager) => ({
     },
 
     async slashExecute(interaction) {
-        try {
-            // Defer reply first
-            await interaction.deferReply({ flags: MessageFlags.Ephemeral }); // Bank commands are personal
-        } catch (deferError) {
-            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
-            if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
-            }
-            return;
-        }
+        // DEFER REPLY IS REMOVED FROM HERE - IT'S NOW IN COMMANDHANDLER.JS
         await this.executeCommand(interaction.user.id, interaction.user.username, interaction);
     },
 });
