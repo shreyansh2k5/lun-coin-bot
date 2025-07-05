@@ -1,53 +1,46 @@
 // src/services/coinManager.js
 const { DEFAULT_BALANCE } = require('../config/gameConfig');
-// Import Firestore functions from firebase-admin
 const admin = require('firebase-admin');
-const { FieldValue } = admin.firestore; // Import FieldValue for atomic updates
+const { FieldValue } = admin.firestore;
 
 class CoinManager {
     constructor(db) {
-        this.db = db; // This 'db' will now be admin.firestore()
+        this.db = db;
         this.usersCollection = 'users'; // Name of the Firestore collection for users
         this.coinsField = 'coins';     // Name of the field storing coin balance
-        this.bankedCoinsField = 'bankedCoins'; // New: Field for banked coins
-        this.isBankedField = 'isBanked';       // New: Field to indicate if user is banked
-        this.lastBankDepositField = 'lastBankDeposit'; // New: Timestamp for last deposit
-        this.lastBankWithdrawField = 'lastBankWithdraw'; // New: Timestamp for last withdrawal
+        this.isBankedField = 'isBanked';       // Field to indicate if user is in safe mode
+        this.lastBankToggleField = 'lastBankToggle'; // Timestamp for last deposit/withdraw action
         this.defaultBalance = DEFAULT_BALANCE;   // Default balance for new users
     }
 
     /**
-     * Gets the current coin balance and bank balance for a user.
+     * Gets the current coin balance and bank status for a user.
      * If the user's document does not exist in Firestore, it will be created
      * and initialized with the default balance.
      *
      * @param {string} userId The Discord user ID.
-     * @returns {Promise<{coins: number, bankedCoins: number, isBanked: boolean, lastBankDeposit: number, lastBankWithdraw: number}>} A Promise that resolves with the user's coin and bank balance, and bank status.
+     * @returns {Promise<{coins: number, isBanked: boolean, lastBankToggle: number}>} A Promise that resolves with the user's coin balance and bank status.
      */
     async getUserData(userId) {
         try {
-            const userRef = this.db.collection(this.usersCollection).doc(userId); // Admin SDK syntax
-            const userSnap = await userRef.get(); // Admin SDK syntax
+            const userRef = this.db.collection(this.usersCollection).doc(userId);
+            const userSnap = await userRef.get();
 
             if (userSnap.exists) {
                 const data = userSnap.data();
                 return {
                     coins: typeof data[this.coinsField] === 'number' ? data[this.coinsField] : 0,
-                    bankedCoins: typeof data[this.bankedCoinsField] === 'number' ? data[this.bankedCoinsField] : 0,
                     isBanked: typeof data[this.isBankedField] === 'boolean' ? data[this.isBankedField] : false,
-                    lastBankDeposit: typeof data[this.lastBankDepositField] === 'number' ? data[this.lastBankDepositField] : 0,
-                    lastBankWithdraw: typeof data[this.lastBankWithdrawField] === 'number' ? data[this.lastBankWithdrawField] : 0,
+                    lastBankToggle: typeof data[this.lastBankToggleField] === 'number' ? data[this.lastBankToggleField] : 0,
                 };
             } else {
                 // User does not exist, initialize with default balance and bank status
                 const initialData = {
                     [this.coinsField]: this.defaultBalance,
-                    [this.bankedCoinsField]: 0,
                     [this.isBankedField]: false,
-                    [this.lastBankDepositField]: 0,
-                    [this.lastBankWithdrawField]: 0,
+                    [this.lastBankToggleField]: 0,
                 };
-                await userRef.set(initialData); // Admin SDK syntax
+                await userRef.set(initialData);
                 return initialData;
             }
         } catch (error) {
@@ -55,10 +48,8 @@ class CoinManager {
             // Return default values on error to prevent bot from crashing
             return {
                 coins: 0,
-                bankedCoins: 0,
                 isBanked: false,
-                lastBankDeposit: 0,
-                lastBankWithdraw: 0,
+                lastBankToggle: 0,
             };
         }
     }
@@ -117,11 +108,10 @@ class CoinManager {
             throw new Error("Transfer amount must be positive.");
         }
 
-        // Use a Firestore transaction for atomic read-modify-write operations
         try {
-            await this.db.runTransaction(async transaction => { // Admin SDK syntax
-                const senderRef = this.db.collection(this.usersCollection).doc(senderId); // Admin SDK syntax
-                const receiverRef = this.db.collection(this.usersCollection).doc(receiverId); // Admin SDK syntax
+            await this.db.runTransaction(async transaction => {
+                const senderRef = this.db.collection(this.usersCollection).doc(senderId);
+                const receiverRef = this.db.collection(this.usersCollection).doc(receiverId);
 
                 const [senderDoc, receiverDoc] = await Promise.all([
                     transaction.get(senderRef),
@@ -136,10 +126,10 @@ class CoinManager {
                 }
 
                 // Update sender's balance
-                transaction.set(senderRef, { [this.coinsField]: senderCoins - amount }, { merge: true }); // Admin SDK syntax
+                transaction.set(senderRef, { [this.coinsField]: senderCoins - amount }, { merge: true });
 
                 // Update receiver's balance
-                transaction.set(receiverRef, { [this.coinsField]: receiverCoins + amount }, { merge: true }); // Admin SDK syntax
+                transaction.set(receiverRef, { [this.coinsField]: receiverCoins + amount }, { merge: true });
             });
             return true; // Transaction successful
         } catch (error) {
@@ -160,8 +150,8 @@ class CoinManager {
     async updateCoins(userId, delta) {
         try {
             let newCoins;
-            await this.db.runTransaction(async transaction => { // Admin SDK syntax
-                const userRef = this.db.collection(this.usersCollection).doc(userId); // Admin SDK syntax
+            await this.db.runTransaction(async transaction => {
+                const userRef = this.db.collection(this.usersCollection).doc(userId);
                 const doc = await transaction.get(userRef);
 
                 let currentCoins = doc.exists ? (doc.data()[this.coinsField] || 0) : 0;
@@ -171,7 +161,7 @@ class CoinManager {
                     throw new Error("Insufficient funds. Cannot go below zero coins.");
                 }
 
-                transaction.set(userRef, { [this.coinsField]: newCoins }, { merge: true }); // Admin SDK syntax
+                transaction.set(userRef, { [this.coinsField]: newCoins }, { merge: true });
             });
             return newCoins; // Return the new balance after successful transaction
         } catch (error) {
@@ -181,110 +171,28 @@ class CoinManager {
     }
 
     /**
-     * Deposits coins from a user's main balance to their bank balance.
-     * Sets isBanked to true.
+     * Toggles the user's banked status (safe mode).
      * @param {string} userId The Discord user ID.
-     * @param {number} amount The amount to deposit.
-     * @returns {Promise<{coins: number, bankedCoins: number}>} The new main and banked balances.
-     * @throws {Error} If amount is invalid or insufficient funds.
+     * @param {boolean} status The new status (true for safe, false for vulnerable).
+     * @returns {Promise<boolean>} The new banked status.
+     * @throws {Error} If update fails.
      */
-    async depositCoins(userId, amount) {
-        if (amount <= 0) {
-            throw new Error("Deposit amount must be positive.");
-        }
-
+    async setBankedStatus(userId, status) {
         try {
-            let newCoins, newBankedCoins;
-            await this.db.runTransaction(async (transaction) => { // Admin SDK syntax
-                const userRef = this.db.collection(this.usersCollection).doc(userId); // Admin SDK syntax
-                const userSnap = await transaction.get(userRef);
-
-                const userData = userSnap.exists ? userSnap.data() : {
-                    [this.coinsField]: 0,
-                    [this.bankedCoinsField]: 0,
-                    [this.isBankedField]: false,
-                    [this.lastBankDepositField]: 0,
-                    [this.lastBankWithdrawField]: 0,
-                };
-
-                let currentCoins = userData[this.coinsField] || 0;
-                let currentBankedCoins = userData[this.bankedCoinsField] || 0;
-
-                if (currentCoins < amount) {
-                    throw new Error("Insufficient funds in your main balance to deposit.");
-                }
-
-                newCoins = currentCoins - amount;
-                newBankedCoins = currentBankedCoins + amount;
-
-                transaction.update(userRef, { // Admin SDK syntax
-                    [this.coinsField]: newCoins,
-                    [this.bankedCoinsField]: newBankedCoins,
-                    [this.isBankedField]: true, // User is now banked
-                    [this.lastBankDepositField]: FieldValue.serverTimestamp(), // Use server timestamp
-                });
+            const userRef = this.db.collection(this.usersCollection).doc(userId);
+            await userRef.update({
+                [this.isBankedField]: status,
+                [this.lastBankToggleField]: FieldValue.serverTimestamp(),
             });
-            return { coins: newCoins, bankedCoins: newBankedCoins };
+            return status;
         } catch (error) {
-            console.error(`Error depositing coins for user ${userId}:`, error.message);
+            console.error(`Error setting banked status for user ${userId} to ${status}:`, error.message);
             throw error;
         }
     }
 
     /**
-     * Withdraws coins from a user's bank balance to their main balance.
-     * Sets isBanked to false if all banked coins are withdrawn.
-     * @param {string} userId The Discord user ID.
-     * @param {number} amount The amount to withdraw.
-     * @returns {Promise<{coins: number, bankedCoins: number}>} The new main and banked balances.
-     * @throws {Error} If amount is invalid or insufficient banked funds.
-     */
-    async withdrawCoins(userId, amount) {
-        if (amount <= 0) {
-            throw new Error("Withdrawal amount must be positive.");
-        }
-
-        try {
-            let newCoins, newBankedCoins;
-            await this.db.runTransaction(async (transaction) => { // Admin SDK syntax
-                const userRef = this.db.collection(this.usersCollection).doc(userId); // Admin SDK syntax
-                const userSnap = await transaction.get(userRef);
-
-                const userData = userSnap.exists ? userSnap.data() : {
-                    [this.coinsField]: 0,
-                    [this.bankedCoinsField]: 0,
-                    [this.isBankedField]: false,
-                    [this.lastBankDepositField]: 0,
-                    [this.lastBankWithdrawField]: 0,
-                };
-
-                let currentCoins = userData[this.coinsField] || 0;
-                let currentBankedCoins = userData[this.bankedCoinsField] || 0;
-
-                if (currentBankedCoins < amount) {
-                    throw new Error("Insufficient funds in your bank to withdraw.");
-                }
-
-                newCoins = currentCoins + amount;
-                newBankedCoins = currentBankedCoins - amount;
-                const isBanked = newBankedCoins > 0; // Only unbank if all coins are withdrawn
-
-                transaction.update(userRef, { // Admin SDK syntax
-                    [this.coinsField]: newCoins,
-                    [this.bankedCoinsField]: newBankedCoins,
-                    [this.isBankedField]: isBanked, // Update bank status
-                    [this.lastBankWithdrawField]: FieldValue.serverTimestamp(), // Use server timestamp
-                });
-            });
-            return { coins: newCoins, bankedCoins: newBankedCoins };
-        } catch (error) {
-            console.error(`Error withdrawing coins for user ${userId}:`, error.message);
-            throw error;
-        }
-    }
-
-    /**
-     * Checks if a user is currently 'banked' (has coins in the bank).
+     * Checks if a user is currently 'banked' (in safe mode).
      * @param {string} userId The Discord user ID.
      * @returns {Promise<boolean>} True if the user is banked, false otherwise.
      */
@@ -299,8 +207,8 @@ class CoinManager {
      */
     async getAllUserBalances() {
         try {
-            const usersColRef = this.db.collection(this.usersCollection); // Admin SDK syntax
-            const snapshot = await usersColRef.get(); // Admin SDK syntax
+            const usersColRef = this.db.collection(this.usersCollection);
+            const snapshot = await usersColRef.get();
             const users = [];
             snapshot.forEach(doc => {
                 const data = doc.data();
