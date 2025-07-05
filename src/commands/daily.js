@@ -56,7 +56,17 @@ module.exports = (coinManager) => ({
     },
 
     async slashExecute(interaction) {
-        await interaction.deferReply({ ephemeral: false });
+        try {
+            // Defer reply first
+            await interaction.deferReply({ flags: 0 }); // Daily command should be public
+        } catch (deferError) {
+            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
+            }
+            return;
+        }
+        
         const userId = interaction.user.id;
         const username = interaction.user.username;
         await this.executeCommand(userId, username, (content, ephemeral) => interaction.followUp({ content, flags: ephemeral ? MessageFlags.Ephemeral : 0 }));
