@@ -51,6 +51,7 @@ module.exports = (coinManager) => ({
 
             // Determine if it's an interaction or a message and reply accordingly
             if (interactionOrMessage.followUp) { // It's an interaction
+                // Use followUp after deferReply
                 await interactionOrMessage.followUp({ embeds: [profileEmbed] });
             } else { // It's a message
                 await interactionOrMessage.channel.send({ embeds: [profileEmbed] });
@@ -60,6 +61,7 @@ module.exports = (coinManager) => ({
             console.error(`Error in profile command for user ${targetId}:`, error);
             // Determine if it's an interaction or a message and reply accordingly for errors
             if (interactionOrMessage.followUp) { // It's an interaction
+                // Use followUp after deferReply, and use flags
                 await interactionOrMessage.followUp({ content: `Sorry, there was an error fetching the profile: ${error.message}`, flags: MessageFlags.Ephemeral });
             } else { // It's a message
                 await interactionOrMessage.channel.send(`Sorry, there was an error fetching the profile: ${error.message}`);
@@ -80,8 +82,18 @@ module.exports = (coinManager) => ({
     },
 
     async slashExecute(interaction) {
-        // Defer reply first to prevent "Unknown interaction" error
-        await interaction.deferReply({ ephemeral: false }); // Profile command should be public
+        try {
+            // Defer reply first to prevent "Unknown interaction" error
+            // Use flags: 0 for public replies (not ephemeral)
+            await interaction.deferReply({ flags: 0 });
+        } catch (deferError) {
+            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
+            // If defer fails, try to reply ephemerally immediately as a last resort
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
+            }
+            return; // Stop execution if deferral failed
+        }
 
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const targetMember = interaction.options.getMember('user') || interaction.member;
