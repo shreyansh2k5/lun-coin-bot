@@ -16,11 +16,9 @@ module.exports = (coinManager) => ({
         .setName('bank_deposit')
         .setDescription('Activate safe mode. You cannot be raided and cannot raid others for 24 hours.'),
 
-    // Changed replyFunction to interaction for direct access
+    // interaction is passed directly here
     async executeCommand(userId, username, interaction) {
-        // Defer reply first
-        await interaction.deferReply({ ephemeral: true });
-
+        // Defer reply is already handled in slashExecute, so no need to defer here again
         const now = Date.now();
         const lastUsed = bankToggleCooldowns.get(userId);
 
@@ -58,11 +56,20 @@ module.exports = (coinManager) => ({
     },
 
     async prefixExecute(message, args) {
-        // For simplicity, this command will be slash-only.
         return message.channel.send('The `$bank_deposit` command is only available as a slash command (`/bank_deposit`).');
     },
 
     async slashExecute(interaction) {
+        try {
+            // Defer reply first
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral }); // Bank commands are personal
+        } catch (deferError) {
+            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
+            }
+            return;
+        }
         await this.executeCommand(interaction.user.id, interaction.user.username, interaction);
     },
 });
