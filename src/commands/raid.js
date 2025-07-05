@@ -20,9 +20,10 @@ module.exports = (coinManager) => ({
                 .setDescription('The user you want to raid')
                 .setRequired(true)),
 
-    async executeCommand(raiderId, raiderUsername, targetUser, replyFunction) {
+    // Changed replyFunction to interaction for direct access
+    async executeCommand(raiderId, raiderUsername, targetUser, interaction) {
         // Defer reply first to prevent "Unknown interaction" error
-        await replyFunction.defer({ ephemeral: false });
+        await interaction.deferReply({ ephemeral: false });
 
         const now = Date.now();
         const lastUsed = raidCooldowns.get(raiderId);
@@ -40,14 +41,14 @@ module.exports = (coinManager) => ({
             if (seconds > 0) timeString += `${seconds} second(s) `;
             timeString = timeString.trim();
 
-            return replyFunction.followUp({ content: `You can attempt another raid in ${timeString}.`, flags: MessageFlags.Ephemeral });
+            return interaction.followUp({ content: `You can attempt another raid in ${timeString}.`, flags: MessageFlags.Ephemeral });
         }
 
         const targetId = targetUser.id;
         const targetUsername = targetUser.username;
 
         if (raiderId === targetId) {
-            return replyFunction.followUp({ content: 'You cannot raid yourself!', flags: MessageFlags.Ephemeral });
+            return interaction.followUp({ content: 'You cannot raid yourself!', flags: MessageFlags.Ephemeral });
         }
 
         try {
@@ -56,10 +57,10 @@ module.exports = (coinManager) => ({
 
             // Check if raider or target is in safe mode
             if (raiderData.isBanked) {
-                return replyFunction.followUp({ content: `${raiderUsername}, you cannot raid while you are in safe mode! Use \`/withdraw\` first.`, flags: MessageFlags.Ephemeral });
+                return interaction.followUp({ content: `${raiderUsername}, you cannot raid while you are in safe mode! Use \`/withdraw\` first.`, flags: MessageFlags.Ephemeral });
             }
             if (targetData.isBanked) {
-                return replyFunction.followUp({ content: `${targetUsername} is currently in safe mode. You cannot raid them!`, flags: MessageFlags.Ephemeral });
+                return interaction.followUp({ content: `${targetUsername} is currently in safe mode. You cannot raid them!`, flags: MessageFlags.Ephemeral });
             }
 
             const raiderCoins = raiderData.coins;
@@ -67,7 +68,7 @@ module.exports = (coinManager) => ({
 
             // Ensure both parties have at least some minimum amount to make the raid meaningful
             if (raiderCoins < 100 || targetCoins < 100) { // Arbitrary minimum for a meaningful raid
-                return replyFunction.followUp({ content: `Both you and your target need at least 100 💰 to participate in a raid.`, flags: MessageFlags.Ephemeral });
+                return interaction.followUp({ content: `Both you and your target need at least 100 💰 to participate in a raid.`, flags: MessageFlags.Ephemeral });
             }
 
             const isSuccess = Math.random() < RAID_SUCCESS_CHANCE; // 50% chance
@@ -79,7 +80,7 @@ module.exports = (coinManager) => ({
                 // Raider wins: target loses coins, raider gains. Amount is based on target's coins.
                 raidAmount = Math.min(Math.floor(targetCoins * RAID_MAX_PERCENTAGE), targetCoins);
                 if (raidAmount === 0) { // If target has very few coins, raidAmount might be 0
-                    return replyFunction.followUp(`You successfully attempted to raid ${targetUsername}, but they had no coins to steal!`);
+                    return interaction.followUp(`You successfully attempted to raid ${targetUsername}, but they had no coins to steal!`);
                 }
                 await coinManager.transferCoins(targetId, raiderId, raidAmount);
                 resultMessage = `🎉 **${raiderUsername}** successfully raided **${targetUsername}** and stole **${raidAmount}** 💰!`;
@@ -87,10 +88,10 @@ module.exports = (coinManager) => ({
                 // Raider loses: raider loses coins, target gains. Amount is based on raider's coins.
                 raidAmount = Math.min(Math.floor(raiderCoins * RAID_MAX_PERCENTAGE), raiderCoins);
                 if (raidAmount === 0) { // If raider has very few coins, raidAmount might be 0
-                    return replyFunction.followUp(`You failed to raid ${targetUsername}, but you had no coins to lose!`);
+                    return interaction.followUp(`You failed to raid ${targetUsername}, but you had no coins to lose!`);
                 }
                 await coinManager.transferCoins(raiderId, targetId, raidAmount);
-                resultMessage = `💔 **${raiderUsername}** failed to raid **${targetUsername}** and had to pay them **${raidAmount}** 💰!`;
+                resultMessage = `💔 **${raaderUsername}** failed to raid **${targetUsername}** and had to pay them **${raidAmount}** 💰!`;
             }
 
             raidCooldowns.set(raiderId, now); // Set cooldown for the raider
@@ -102,7 +103,7 @@ module.exports = (coinManager) => ({
             resultMessage += `\n**${raiderUsername}**'s new balance: **${updatedRaiderData.coins}** 💰.`;
             resultMessage += `\n**${targetUsername}**'s new balance: **${updatedTargetData.coins}** 💰.`;
 
-            await replyFunction.followUp(resultMessage);
+            await interaction.followUp(resultMessage);
 
         } catch (error) {
             console.error(`Error in raid command for ${raiderUsername} raiding ${targetUsername}:`, error);
@@ -110,7 +111,7 @@ module.exports = (coinManager) => ({
             if (error.message.includes("Insufficient funds")) {
                 errorMessage = `You don't have enough coins to cover the potential loss for this raid.`;
             }
-            await replyFunction.followUp({ content: `Sorry ${raiderUsername}, ${errorMessage}`, flags: MessageFlags.Ephemeral });
+            await interaction.followUp({ content: `Sorry ${raiderUsername}, ${errorMessage}`, flags: MessageFlags.Ephemeral });
         }
     },
 
