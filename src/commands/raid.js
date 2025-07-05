@@ -1,0 +1,130 @@
+// src/commands/raid.js
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { RAID_SUCCESS_CHANCE, RAID_MAX_PERCENTAGE, RAID_COOLDOWN_MS } = require('../config/gameConfig');
+
+const raidCooldowns = new Map(); // Stores userId -> lastUsedTimestamp
+
+/**
+ * Factory function to create the raid command.
+ * @param {import('../services/coinManager')} coinManager The CoinManager instance.
+ * @returns {object} The command object.
+ */
+module.exports = (coinManager) => ({
+    name: 'raid',
+    description: 'Attempt to raid another user and steal their coins, or lose some of yours!',
+    slashCommandData: new SlashCommandBuilder()
+        .setName('raid')
+        .setDescription('Attempt to raid another user and steal their coins, or lose some of yours!')
+        .addUserOption(option =>
+            option.setName('target')
+                .setDescription('The user you want to raid')
+                .setRequired(true)),
+
+    async executeCommand(raiderId, raiderUsername, targetUser, replyFunction) {
+        // Defer reply first to prevent "Unknown interaction" error
+        await replyFunction.defer({ ephemeral: false });
+
+        const now = Date.now();
+        const lastUsed = raidCooldowns.get(raiderId);
+
+        // Cooldown check for raider
+        if (lastUsed && (now - lastUsed < RAID_COOLDOWN_MS)) {
+            const timeLeft = RAID_COOLDOWN_MS - (now - lastUsed);
+            const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+            const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+            let timeString = '';
+            if (hours > 0) timeString += `${hours} hour(s) `;
+            if (minutes > 0) timeString += `${minutes} minute(s) `;
+            if (seconds > 0) timeString += `${seconds} second(s) `;
+            timeString = timeString.trim();
+
+            return replyFunction.followUp({ content: `You can attempt another raid in ${timeString}.`, flags: MessageFlags.Ephemeral });
+        }
+
+        const targetId = targetUser.id;
+        const targetUsername = targetUser.username;
+
+        if (raiderId === targetId) {
+            return replyFunction.followUp({ content: 'You cannot raid yourself!', flags: MessageFlags.Ephemeral });
+        }
+
+        try {
+            const raiderData = await coinManager.getUserData(raiderId);
+            const targetData = await coinManager.getUserData(targetId);
+
+            // Check if raider or target is in safe mode
+            if (raiderData.isBanked) {
+                return replyFunction.followUp({ content: `${raiderUsername}, you cannot raid while you are in safe mode! Use \`/withdraw\` first.`, flags: MessageFlags.Ephemeral });
+            }
+            if (targetData.isBanked) {
+                return replyFunction.followUp({ content: `${targetUsername} is currently in safe mode. You cannot raid them!`, flags: MessageFlags.Ephemeral });
+            }
+
+            const raiderCoins = raiderData.coins;
+            const targetCoins = targetData.coins;
+
+            // Ensure both parties have at least some minimum amount to make the raid meaningful
+            if (raiderCoins < 100 || targetCoins < 100) { // Arbitrary minimum for a meaningful raid
+                return replyFunction.followUp({ content: `Both you and your target need at least 100 💰 to participate in a raid.`, flags: MessageFlags.Ephemeral });
+            }
+
+            const isSuccess = Math.random() < RAID_SUCCESS_CHANCE; // 50% chance
+
+            let raidAmount;
+            let resultMessage;
+
+            if (isSuccess) {
+                // Raider wins: target loses coins, raider gains. Amount is based on target's coins.
+                raidAmount = Math.min(Math.floor(targetCoins * RAID_MAX_PERCENTAGE), targetCoins);
+                if (raidAmount === 0) { // If target has very few coins, raidAmount might be 0
+                    return replyFunction.followUp(`You successfully attempted to raid ${targetUsername}, but they had no coins to steal!`);
+                }
+                await coinManager.transferCoins(targetId, raiderId, raidAmount);
+                resultMessage = `🎉 **${raiderUsername}** successfully raided **${targetUsername}** and stole **${raidAmount}** 💰!`;
+            } else {
+                // Raider loses: raider loses coins, target gains. Amount is based on raider's coins.
+                raidAmount = Math.min(Math.floor(raiderCoins * RAID_MAX_PERCENTAGE), raiderCoins);
+                if (raidAmount === 0) { // If raider has very few coins, raidAmount might be 0
+                    return replyFunction.followUp(`You failed to raid ${targetUsername}, but you had no coins to lose!`);
+                }
+                await coinManager.transferCoins(raiderId, targetId, raidAmount);
+                resultMessage = `💔 **${raiderUsername}** failed to raid **${targetUsername}** and had to pay them **${raidAmount}** 💰!`;
+            }
+
+            raidCooldowns.set(raiderId, now); // Set cooldown for the raider
+
+            // Fetch updated balances for the message
+            const updatedRaiderData = await coinManager.getUserData(raiderId);
+            const updatedTargetData = await coinManager.getUserData(targetId);
+
+            resultMessage += `\n**${raiderUsername}**'s new balance: **${updatedRaiderData.coins}** 💰.`;
+            resultMessage += `\n**${targetUsername}**'s new balance: **${updatedTargetData.coins}** 💰.`;
+
+            await replyFunction.followUp(resultMessage);
+
+        } catch (error) {
+            console.error(`Error in raid command for ${raiderUsername} raiding ${targetUsername}:`, error);
+            let errorMessage = `An error occurred during the raid: ${error.message}`;
+            if (error.message.includes("Insufficient funds")) {
+                errorMessage = `You don't have enough coins to cover the potential loss for this raid.`;
+            }
+            await replyFunction.followUp({ content: `Sorry ${raiderUsername}, ${errorMessage}`, flags: MessageFlags.Ephemeral });
+        }
+    },
+
+    async prefixExecute(message, args) {
+        // For simplicity, raid command will be slash-only as user mentions are more robust.
+        return message.channel.send('The `$raid` command is only available as a slash command (`/raid`).');
+    },
+
+    async slashExecute(interaction) {
+        const raiderId = interaction.user.id;
+        const raiderUsername = interaction.user.username;
+        const targetUser = interaction.options.getUser('target');
+
+        // Pass interaction itself as replyFunction, so executeCommand can use defer/followUp
+        await this.executeCommand(raiderId, raiderUsername, targetUser, interaction);
+    },
+});
