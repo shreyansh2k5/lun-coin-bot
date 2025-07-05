@@ -115,6 +115,7 @@ async function handleSlashCommand(interaction, coinManager, client) {
     try {
         // Attempt to defer reply immediately. This is the first and fastest action.
         // Determine if the command should be ephemeral by default
+        // This is where the initial "Bot is thinking..." message comes from.
         const ephemeralDefault = ['bank_deposit', 'bank_withdraw'].includes(interaction.commandName);
         await interaction.deferReply({ flags: ephemeralDefault ? MessageFlags.Ephemeral : 0 });
 
