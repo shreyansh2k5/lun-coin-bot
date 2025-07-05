@@ -2,14 +2,15 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { RAID_SUCCESS_CHANCE, RAID_MAX_PERCENTAGE, RAID_COOLDOWN_MS } = require('../config/gameConfig');
 
-const raidCooldowns = new Map();
+const raidCooldowns = new Map(); // Stores userId -> lastUsedTimestamp
 
 /**
  * Factory function to create the raid command.
  * @param {import('../services/coinManager')} coinManager The CoinManager instance.
+ * @param {import('discord.js').Client} client The Discord client instance. // NEW: Added client
  * @returns {object} The command object.
  */
-module.exports = (coinManager) => ({
+module.exports = (coinManager, client) => ({ // NEW: Accept client
     name: 'raid',
     description: 'Attempt to raid another user and steal their coins, or lose some of yours!',
     slashCommandData: new SlashCommandBuilder()
@@ -21,10 +22,11 @@ module.exports = (coinManager) => ({
                 .setRequired(true)),
 
     async executeCommand(raiderId, raiderUsername, targetUser, interaction) {
-        // DEFER REPLY IS REMOVED FROM HERE - IT'S NOW IN COMMANDHANDLER.JS
+        // Defer reply is already handled in slashExecute, so no need to defer here again
         const now = Date.now();
         const lastUsed = raidCooldowns.get(raiderId);
 
+        // Cooldown check for raider
         if (lastUsed && (now - lastUsed < RAID_COOLDOWN_MS)) {
             const timeLeft = RAID_COOLDOWN_MS - (now - lastUsed);
             const hours = Math.floor(timeLeft / (1000 * 60 * 60));
@@ -51,6 +53,7 @@ module.exports = (coinManager) => ({
             const raiderData = await coinManager.getUserData(raiderId);
             const targetData = await coinManager.getUserData(targetId);
 
+            // Check if raider or target is in safe mode
             if (raiderData.isBanked) {
                 return interaction.followUp({ content: `${raiderUsername}, you cannot raid while you are in safe mode! Use \`/withdraw\` first.`, flags: MessageFlags.Ephemeral });
             }
@@ -61,38 +64,54 @@ module.exports = (coinManager) => ({
             const raiderCoins = raiderData.coins;
             const targetCoins = targetData.coins;
 
-            if (raiderCoins < 100 || targetCoins < 100) {
+            // Ensure both parties have at least some minimum amount to make the raid meaningful
+            if (raiderCoins < 100 || targetCoins < 100) { // Arbitrary minimum for a meaningful raid
                 return interaction.followUp({ content: `Both you and your target need at least 100 💰 to participate in a raid.`, flags: MessageFlags.Ephemeral });
             }
 
-            const isSuccess = Math.random() < RAID_SUCCESS_CHANCE;
+            const isSuccess = Math.random() < RAID_SUCCESS_CHANCE; // 50% chance
 
             let raidAmount;
             let resultMessage;
+            let dmMessageToTarget;
 
             if (isSuccess) {
+                // Raider wins: target loses coins, raider gains. Amount is based on target's coins.
                 raidAmount = Math.min(Math.floor(targetCoins * RAID_MAX_PERCENTAGE), targetCoins);
                 if (raidAmount === 0) {
                     return interaction.followUp(`You successfully attempted to raid ${targetUsername}, but they had no coins to steal!`);
                 }
                 await coinManager.transferCoins(targetId, raiderId, raidAmount);
                 resultMessage = `🎉 **${raiderUsername}** successfully raided **${targetUsername}** and stole **${raidAmount}** 💰!`;
+                dmMessageToTarget = `💔 You were raided by **${raiderUsername}** and lost **${raidAmount}** 💰!`;
             } else {
+                // Raider loses: raider loses coins, target gains. Amount is based on raider's coins.
                 raidAmount = Math.min(Math.floor(raiderCoins * RAID_MAX_PERCENTAGE), raiderCoins);
                 if (raidAmount === 0) {
                     return interaction.followUp(`You failed to raid ${targetUsername}, but you had no coins to lose!`);
                 }
                 await coinManager.transferCoins(raiderId, targetId, raidAmount);
                 resultMessage = `💔 **${raiderUsername}** failed to raid **${targetUsername}** and had to pay them **${raidAmount}** 💰!`;
+                dmMessageToTarget = `🎉 **${raiderUsername}** attempted to raid you and FAILED! They had to pay you **${raidAmount}** 💰!`;
             }
 
-            raidCooldowns.set(raiderId, now);
+            raidCooldowns.set(raiderId, now); // Set cooldown for the raider
 
+            // Fetch updated balances for the message
             const updatedRaiderData = await coinManager.getUserData(raiderId);
             const updatedTargetData = await coinManager.getUserData(targetId);
 
             resultMessage += `\n**${raiderUsername}**'s new balance: **${updatedRaiderData.coins}** 💰.`;
             resultMessage += `\n**${targetUsername}**'s new balance: **${updatedTargetData.coins}** 💰.`;
+
+            // Send DM to the raided user
+            try {
+                const targetDiscordUser = await client.users.fetch(targetId);
+                await targetDiscordUser.send(`${dmMessageToTarget}\nYour new balance: **${updatedTargetData.coins}** 💰.`);
+            } catch (dmError) {
+                console.error(`Failed to send DM to ${targetUsername} (${targetId}):`, dmError);
+                resultMessage += `\n*(Could not send DM notification to ${targetUsername}.)*`;
+            }
 
             await interaction.followUp(resultMessage);
 
