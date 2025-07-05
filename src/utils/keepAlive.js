@@ -1,26 +1,23 @@
 // src/utils/keepAlive.js
-const http = require('http'); // Import Node.js's built-in HTTP module
+const express = require('express');
+const app = express();
+const port = process.env.PORT || 10000; // Use environment variable for port
 
 /**
- * Starts a simple HTTP server to keep the Render service alive.
- * This server listens on the port provided by Render's PORT environment variable.
+ * Starts a simple HTTP server to keep the bot alive on platforms like Render.
+ * It listens on a specified port and responds to basic GET requests.
  */
-function startKeepAliveServer() {
-    const PORT = process.env.PORT || 3000; // Render provides a PORT env var, default to 3000 for local testing
+function keepAlive() {
+  app.get('/', (req, res) => {
+    res.send('Bot is alive!');
+  });
 
-    const server = http.createServer((req, res) => {
-        res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('Discord bot is running!\n'); // Simple response
-    });
-
-    server.listen(PORT, () => {
-        console.log(`Keep-alive server listening on port ${PORT}`);
-    });
-
-    // Return the server instance so it can be closed gracefully
-    return server;
+  app.listen(port, () => {
+    console.log(`Keep-alive server listening on port ${port}`);
+  });
 }
 
+// Export the keepAlive function as a named export
 module.exports = {
-    startKeepAliveServer
+    keepAlive
 };
