@@ -63,6 +63,7 @@ module.exports = (coinManager, client) => ({
     },
 
     async slashExecute(interaction) {
+        await interaction.deferReply({ ephemeral: false });
         await this.executeCommand((content) => interaction.followUp(content));
     },
 });
