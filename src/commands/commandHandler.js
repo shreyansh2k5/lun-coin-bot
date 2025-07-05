@@ -14,7 +14,7 @@ const addCoinsCommand = require('./add_coins');
 const deductCoinsCommand = require('./deduct_coins');
 const leaderboardCommand = require('./leaderboard');
 const profileCommand = require('./profile');
-const raidCommand = require('./raid');
+const raidCommand = require('./raid'); // Make sure this is imported
 const bankDepositCommand = require('./bank_deposit');
 const bankWithdrawCommand = require('./bank_withdraw');
 
@@ -49,7 +49,7 @@ function registerCommand(command) {
  * @param {import('discord.js').Client} client The Discord client instance.
  */
 function registerAllCommands(coinManager, client) {
-    registerCommand(pingCommand()); // Ping doesn't need coinManager
+    registerCommand(pingCommand());
     registerCommand(balanceCommand(coinManager));
     registerCommand(giveCommand(coinManager, client));
     registerCommand(helpCommand(prefixCommands, slashCommandsData, slashCommands));
@@ -61,7 +61,7 @@ function registerAllCommands(coinManager, client) {
     registerCommand(deductCoinsCommand(coinManager, client));
     registerCommand(leaderboardCommand(coinManager, client));
     registerCommand(profileCommand(coinManager));
-    registerCommand(raidCommand(coinManager));
+    registerCommand(raidCommand(coinManager, client)); // NEW: Pass client here
     registerCommand(bankDepositCommand(coinManager));
     registerCommand(bankWithdrawCommand(coinManager));
 
@@ -113,28 +113,17 @@ async function handleSlashCommand(interaction, coinManager, client) {
     }
 
     try {
-        // Attempt to defer reply immediately. This is the first and fastest action.
-        // Determine if the command should be ephemeral by default
-        // This is where the initial "Bot is thinking..." message comes from.
         const ephemeralDefault = ['bank_deposit', 'bank_withdraw'].includes(interaction.commandName);
         await interaction.deferReply({ flags: ephemeralDefault ? MessageFlags.Ephemeral : 0 });
 
-        // Now, the individual command's slashExecute method should NOT call deferReply.
-        // It should directly use interaction.followUp() for all its responses.
-        await command.slashExecute(interaction, coinManager, client);
+        await command.slashExecute(interaction, coinManager, client); // Pass client here
     } catch (error) {
-        // This catch block will primarily handle errors from deferReply itself,
-        // or unexpected synchronous errors before command.slashExecute is awaited.
         console.error(`Error in handleSlashCommand for /${interaction.commandName}:`, error);
 
-        // Only attempt to reply if the interaction hasn't been replied to or deferred yet.
-        // This prevents the "Interaction has already been acknowledged" error.
         if (!interaction.replied && !interaction.deferred) {
             await interaction.reply({ content: `An unexpected error occurred: ${error.message}`, flags: MessageFlags.Ephemeral })
                 .catch(e => console.error("Failed to send initial error reply:", e));
         } else {
-            // If it was already deferred/replied, try to follow up if possible,
-            // but the original error might still be from a timeout.
             await interaction.followUp({ content: `An error occurred during command execution: ${error.message}`, flags: MessageFlags.Ephemeral })
                 .catch(e => console.error("Failed to send followUp error message:", e));
         }
