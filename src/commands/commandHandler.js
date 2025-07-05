@@ -13,9 +13,7 @@ const begCommand = require('./beg');
 const addCoinsCommand = require('./add_coins');
 const deductCoinsCommand = require('./deduct_coins');
 const leaderboardCommand = require('./leaderboard');
-// Removed: const raidCommand = require('./raid');
-// Removed: const bankDepositCommand = require('./bank_deposit');
-// Removed: const bankWithdrawCommand = require('./bank_withdraw');
+const profileCommand = require('./profile'); // NEW: Import the profile command
 
 // Maps to store commands, accessible by their name
 const prefixCommands = new Collection();
@@ -72,10 +70,8 @@ function registerAllCommands(coinManager, client) {
     // Register leaderboard command
     registerCommand(leaderboardCommand(coinManager, client));
 
-    // Removed registration for raid, bank_deposit, bank_withdraw commands
-    // registerCommand(raidCommand(coinManager));
-    // registerCommand(bankDepositCommand(coinManager));
-    // registerCommand(bankWithdrawCommand(coinManager));
+    // Register NEW profile command
+    registerCommand(profileCommand(coinManager)); // NEW
 
     console.log(`Registered ${prefixCommands.size} prefix commands.`);
     console.log(`Registered ${slashCommands.size} slash commands.`);
