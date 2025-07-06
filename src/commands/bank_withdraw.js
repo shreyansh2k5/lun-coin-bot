@@ -1,8 +1,8 @@
 // src/commands/bank_withdraw.js
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { BANK_TOGGLE_COOLDOWN_MS } = require('../config/gameConfig');
+// const { BANK_TOGGLE_COOLDOWN_MS } = require('../config/gameConfig'); // Cooldown constant no longer needed here
 
-const bankToggleCooldowns = new Map(); // Stores userId -> lastUsedTimestamp for bank toggle
+// const bankToggleCooldowns = new Map(); // Cooldown map no longer needed here
 
 /**
  * Factory function to create the bank_withdraw command.
@@ -18,24 +18,7 @@ module.exports = (coinManager) => ({
 
     async executeCommand(userId, username, interaction) {
         // Defer reply is handled by slashExecute, so no need to defer here again
-        const now = Date.now();
-        const lastUsed = bankToggleCooldowns.get(userId);
-
-        // Cooldown check for bank toggle
-        if (lastUsed && (now - lastUsed < BANK_TOGGLE_COOLDOWN_MS)) {
-            const timeLeft = BANK_TOGGLE_COOLDOWN_MS - (now - lastUsed);
-            const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-            const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-
-            let timeString = '';
-            if (hours > 0) timeString += `${hours} hour(s) `;
-            if (minutes > 0) timeString += `${minutes} minute(s) `;
-            if (seconds > 0) timeString += `${seconds} second(s) `;
-            timeString = timeString.trim();
-
-            return interaction.followUp({ content: `You can change your safe mode status again in ${timeString}.`, flags: MessageFlags.Ephemeral });
-        }
+        // No cooldown check for withdraw
 
         try {
             const userData = await coinManager.getUserData(userId);
@@ -44,7 +27,7 @@ module.exports = (coinManager) => ({
             }
 
             await coinManager.setBankedStatus(userId, false);
-            bankToggleCooldowns.set(userId, now); // Set cooldown
+            // No need to set cooldown in Map or Firestore for withdraw
 
             await interaction.followUp({ content: `🔓 **${username}**, you have deactivated safe mode. You can now be raided and raid others.`, flags: MessageFlags.Ephemeral });
 
