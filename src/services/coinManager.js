@@ -1,5 +1,5 @@
 // src/services/coinManager.js
-const { DEFAULT_BALANCE } = require('../config/gameConfig');
+const { DEFAULT_BALANCE, PET_PRICES } = require('../config/gameConfig'); // Import PET_PRICES
 const admin = require('firebase-admin');
 const { FieldValue } = admin.firestore;
 
@@ -10,16 +10,17 @@ class CoinManager {
         this.coinsField = 'coins';     // Name of the field storing coin balance
         this.isBankedField = 'isBanked';       // Field to indicate if user is in safe mode
         this.lastBankToggleField = 'lastBankToggle'; // Timestamp for last deposit/withdraw action
+        this.petsField = 'pets'; // NEW: Field for user's owned pets (array of strings)
         this.defaultBalance = DEFAULT_BALANCE;   // Default balance for new users
     }
 
     /**
-     * Gets the current coin balance and bank status for a user.
+     * Gets the current coin balance, bank status, and pets for a user.
      * If the user's document does not exist in Firestore, it will be created
      * and initialized with the default balance.
      *
      * @param {string} userId The Discord user ID.
-     * @returns {Promise<{coins: number, isBanked: boolean, lastBankToggle: number}>} A Promise that resolves with the user's coin balance and bank status.
+     * @returns {Promise<{coins: number, isBanked: boolean, lastBankToggle: number, pets: string[]}>} A Promise that resolves with the user's data.
      */
     async getUserData(userId) {
         try {
@@ -32,6 +33,7 @@ class CoinManager {
                     coins: typeof data[this.coinsField] === 'number' ? data[this.coinsField] : 0,
                     isBanked: typeof data[this.isBankedField] === 'boolean' ? data[this.isBankedField] : false,
                     lastBankToggle: typeof data[this.lastBankToggleField] === 'number' ? data[this.lastBankToggleField] : 0,
+                    pets: Array.isArray(data[this.petsField]) ? data[this.petsField] : [], // Ensure pets is an array
                 };
             } else {
                 // User does not exist, initialize with default balance and bank status
@@ -39,6 +41,7 @@ class CoinManager {
                     [this.coinsField]: this.defaultBalance,
                     [this.isBankedField]: false,
                     [this.lastBankToggleField]: 0,
+                    [this.petsField]: [], // Initialize with empty array
                 };
                 await userRef.set(initialData);
                 return initialData;
@@ -50,6 +53,7 @@ class CoinManager {
                 coins: 0,
                 isBanked: false,
                 lastBankToggle: 0,
+                pets: [],
             };
         }
     }
@@ -187,6 +191,50 @@ class CoinManager {
             return status;
         } catch (error) {
             console.error(`Error setting banked status for user ${userId} to ${status}:`, error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Allows a user to buy a pet.
+     * @param {string} userId The Discord user ID.
+     * @param {string} petName The name of the pet to buy.
+     * @param {number} price The price of the pet.
+     * @returns {Promise<{newBalance: number, ownedPets: string[]}>} The new balance and updated list of pets.
+     * @throws {Error} If user has insufficient funds or pet is invalid.
+     */
+    async buyPet(userId, petName, price) {
+        try {
+            let newBalance;
+            let updatedPets;
+
+            await this.db.runTransaction(async transaction => {
+                const userRef = this.db.collection(this.usersCollection).doc(userId);
+                const userSnap = await transaction.get(userRef);
+
+                const userData = userSnap.exists ? userSnap.data() : {
+                    [this.coinsField]: 0,
+                    [this.petsField]: [],
+                };
+
+                let currentCoins = userData[this.coinsField] || 0;
+                let currentPets = Array.isArray(userData[this.petsField]) ? userData[this.petsField] : [];
+
+                if (currentCoins < price) {
+                    throw new Error("Insufficient funds.");
+                }
+
+                newBalance = currentCoins - price;
+                updatedPets = [...currentPets, petName]; // Add the new pet to the array
+
+                transaction.update(userRef, {
+                    [this.coinsField]: newBalance,
+                    [this.petsField]: updatedPets,
+                });
+            });
+            return { newBalance, ownedPets: updatedPets };
+        } catch (error) {
+            console.error(`Error buying pet '${petName}' for user ${userId}:`, error.message);
             throw error;
         }
     }
