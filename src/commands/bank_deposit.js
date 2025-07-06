@@ -2,8 +2,7 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { BANK_DEPOSIT_COOLDOWN_MS } = require('../config/gameConfig'); // Use new constant
 
-// Remove the in-memory Map for cooldowns, as we're using Firestore
-// const bankToggleCooldowns = new Map();
+const bankToggleCooldowns = new Map(); // Stores userId -> lastUsedTimestamp for bank toggle
 
 /**
  * Factory function to create the bank_deposit command.
