@@ -17,7 +17,6 @@ const profileCommand = require('./profile');
 const raidCommand = require('./raid');
 const bankDepositCommand = require('./bank_deposit');
 const bankWithdrawCommand = require('./bank_withdraw');
-const shopCommand = require('./shop'); // NEW: Import the shop command
 
 // Maps to store commands, accessible by their name
 const prefixCommands = new Collection();
@@ -65,7 +64,6 @@ function registerAllCommands(coinManager, client) {
     registerCommand(raidCommand(coinManager, client));
     registerCommand(bankDepositCommand(coinManager));
     registerCommand(bankWithdrawCommand(coinManager));
-    registerCommand(shopCommand(coinManager)); // NEW: Register the shop command
 
     console.log(`Registered ${prefixCommands.size} prefix commands.`);
     console.log(`Registered ${slashCommands.size} slash commands.`);
@@ -120,6 +118,8 @@ async function handleSlashCommand(interaction, coinManager, client) {
         await command.slashExecute(interaction, coinManager, client);
     } catch (error) {
         console.error(`Error executing slash command /${interaction.commandName}:`, error);
+        // This catch block will handle errors from the individual command's slashExecute.
+        // It's crucial to check if interaction has been replied/deferred to avoid "InteractionAlreadyReplied".
         if (interaction.replied || interaction.deferred) {
             await interaction.followUp({ content: `An error occurred during command execution: ${error.message}`, flags: MessageFlags.Ephemeral })
                 .catch(e => console.error("Failed to send followUp error message:", e));
