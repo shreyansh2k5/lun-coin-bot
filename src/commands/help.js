@@ -27,53 +27,66 @@ module.exports = (prefixCommands, slashCommandsData, slashCommands) => ({
         const excludedCommands = ['add_coins', 'deduct_coins']; // Commands to exclude from public help
 
         // --- Unified Commands Section ---
-        let allCommandsValue = '';
+        const allCommands = [];
         const processedCommandNames = new Set(); // To avoid duplicates if a command is both prefix and slash
 
-        // Iterate through all registered prefix commands first
+        // Collect all prefix commands
         prefixCommands.forEach(cmd => {
             if (!excludedCommands.includes(cmd.name) && !processedCommandNames.has(cmd.name)) {
-                let cmdLine = '';
                 const hasPrefix = typeof cmd.prefixExecute === 'function';
                 const hasSlash = typeof cmd.slashExecute === 'function';
+                let cmdLine = '';
 
                 if (hasPrefix && hasSlash) {
-                    cmdLine = `**\`/${cmd.name}\` / \`$${cmd.name}\`** - ${cmd.description}\n`;
+                    cmdLine = `**\`/${cmd.name}\` / \`$${cmd.name}\`** - ${cmd.description}`;
                 } else if (hasPrefix) {
-                    cmdLine = `**\`$${cmd.name}\`** - ${cmd.description}\n`;
-                } else if (hasSlash) { // Should ideally be covered by slashCommands iteration, but for completeness
-                    cmdLine = `**\`/${cmd.name}\`** - ${cmd.description}\n`;
+                    cmdLine = `**\`$${cmd.name}\`** - ${cmd.description}`;
                 }
+                // Slash-only commands will be caught in the next loop if not already added
 
-                if (cmdLine && (allCommandsValue + cmdLine).length <= 1024) { // Check length limit
-                    allCommandsValue += cmdLine;
+                if (cmdLine) {
+                    allCommands.push(cmdLine);
                     processedCommandNames.add(cmd.name);
-                } else if (cmdLine) {
-                    console.warn(`Commands list too long for single field. Truncating.`);
                 }
             }
         });
 
-        // Add any slash-only commands that weren't caught by prefixCommands iteration
+        // Collect any slash-only commands that weren't caught by prefixCommands iteration
         slashCommands.forEach(cmd => {
             if (!excludedCommands.includes(cmd.name) && !processedCommandNames.has(cmd.name)) {
-                const cmdLine = `**\`/${cmd.name}\`** - ${cmd.description}\n`;
-                if ((allCommandsValue + cmdLine).length <= 1024) { // Check length limit
-                    allCommandsValue += cmdLine;
-                    processedCommandNames.add(cmd.name);
-                } else {
-                    console.warn(`Commands list too long for single field. Truncating.`);
-                }
+                const cmdLine = `**\`/${cmd.name}\`** - ${cmd.description}`;
+                allCommands.push(cmdLine);
+                processedCommandNames.add(cmd.name);
             }
         });
 
+        // Sort commands alphabetically for consistent display
+        allCommands.sort();
 
-        if (allCommandsValue) {
-            helpEmbed.addFields({ name: 'Commands', value: allCommandsValue, inline: false });
+        let currentCommandsValue = '';
+        let fieldCount = 0;
+        const maxFieldLength = 1000; // Keep slightly under 1024 to be safe
+
+        for (const cmdLine of allCommands) {
+            const lineToAdd = cmdLine + '\n';
+            if ((currentCommandsValue + lineToAdd).length <= maxFieldLength) {
+                currentCommandsValue += lineToAdd;
+            } else {
+                if (currentCommandsValue) { // Add the current field if it's not empty
+                    helpEmbed.addFields({ name: `Commands${fieldCount > 0 ? ` (Cont.)` : ''}`, value: currentCommandsValue, inline: false });
+                    fieldCount++;
+                }
+                currentCommandsValue = lineToAdd; // Start new field with the current line
+            }
+        }
+        // Add any remaining commands in the last field
+        if (currentCommandsValue) {
+            helpEmbed.addFields({ name: `Commands${fieldCount > 0 ? ` (Cont.)` : ''}`, value: currentCommandsValue, inline: false });
         }
 
 
         // --- Games & Activities Section (Manual listing for better formatting as per image) ---
+        // Ensure backticks are correct for combined commands
         const gamesActivities = `
 **Coin System:** Earn, lose, and transfer coins.
 \` /flip <amount>\` / \`$flip <amount>\`: 50% chance to double your coins or lose them all.
