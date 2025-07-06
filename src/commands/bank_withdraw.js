@@ -40,20 +40,27 @@ module.exports = (coinManager) => {
     },
 
     async slashExecute(interaction) {
+  try {
+    await interaction.deferReply({ ephemeral: true }); // ✅ Correct way to defer with ephemeral
+
+    const userId = interaction.user.id;
+    const username = interaction.user.username;
+
+    await executeCommand(userId, username, interaction);
+  } catch (err) {
+    console.error(`Failed to handle /${interaction.commandName}:`, err);
+
+    if (!interaction.deferred && !interaction.replied) {
       try {
-        await interaction.deferReply({ ephemeral: true });
-        const userId = interaction.user.id;
-        const username = interaction.user.username;
-        await executeCommand(userId, username, interaction);
-      } catch (deferError) {
-        console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
-        if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({
-            content: '⏳ Sorry, I took too long to respond. Please try again.',
-            ephemeral: true
-          }).catch(e => console.error("Failed to send timeout error:", e));
-        }
+        await interaction.reply({
+          content: "⚠️ I took too long to respond. Please try again.",
+          ephemeral: true
+        });
+      } catch (replyError) {
+        console.error("Failed to send fallback error:", replyError);
       }
     }
+  }
+}
   };
 };
