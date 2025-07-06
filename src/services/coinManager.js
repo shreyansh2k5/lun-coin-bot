@@ -182,22 +182,25 @@ class CoinManager {
      * @throws {Error} If update fails.
      */
     async setBankedStatus(userId, status) {
-        try {
-            const userRef = this.db.collection(this.usersCollection).doc(userId);
-            const updateData = {
-                [this.isBankedField]: status,
-            };
-            // Only update lastBankDeposit when setting status to true (depositing)
-            if (status === true) {
-                updateData[this.lastBankDepositField] = FieldValue.serverTimestamp();
-            }
-            await userRef.update(updateData);
-            return status;
-        } catch (error) {
-            console.error(`Error setting banked status for user ${userId} to ${status}:`, error.message);
-            throw error;
+    try {
+        const userRef = this.db.collection(this.usersCollection).doc(userId);
+        const updateData = {
+            [this.isBankedField]: status,
+        };
+        // ✅ Set server timestamp only when depositing (status === true)
+        if (status === true) {
+            updateData[this.lastBankDepositField] = admin.firestore.FieldValue.serverTimestamp();
         }
+        // ✅ Merge instead of update — safe for both new and existing users
+        await userRef.set(updateData, { merge: true });
+
+        return status;
+    } catch (error) {
+        console.error(`Error setting banked status for user ${userId} to ${status}:`, error.message);
+        throw error;
     }
+}
+
 
     /**
      * Allows a user to buy a pet.
