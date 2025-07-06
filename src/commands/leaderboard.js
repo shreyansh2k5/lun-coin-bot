@@ -14,7 +14,8 @@ module.exports = (coinManager, client) => ({
         .setName('leaderboard')
         .setDescription('Shows the top 10 richest users.'),
 
-    async executeCommand(replyFunction) {
+    // executeCommand now accepts interactionOrMessage directly for unified handling
+    async executeCommand(interactionOrMessage) {
         try {
             const allUsers = await coinManager.getAllUserBalances();
 
@@ -25,12 +26,16 @@ module.exports = (coinManager, client) => ({
             const top10Users = allUsers.slice(0, 10);
 
             if (top10Users.length === 0) {
-                return replyFunction('The leaderboard is currently empty!', false);
+                if (interactionOrMessage.followUp) {
+                    return interactionOrMessage.followUp('The leaderboard is currently empty!');
+                } else {
+                    return interactionOrMessage.channel.send('The leaderboard is currently empty!');
+                }
             }
 
             const leaderboardEmbed = new EmbedBuilder()
                 .setColor(0xFFA500) // Orange color
-                .setTitle('💰 Top 10 Richest Users 💰')
+                .setTitle('💰 Top 10 Richest Users �')
                 .setDescription('Here are the users with the most coins!')
                 .setTimestamp()
                 .setFooter({ text: 'Lun Coin Bot Leaderboard' });
@@ -48,34 +53,31 @@ module.exports = (coinManager, client) => ({
                 });
             }
 
-            await replyFunction({ embeds: [leaderboardEmbed] }, false); // Send the embed, not ephemeral
+            if (interactionOrMessage.followUp) {
+                await interactionOrMessage.followUp({ embeds: [leaderboardEmbed] });
+            } else {
+                await interactionOrMessage.channel.send({ embeds: [leaderboardEmbed] });
+            }
 
         } catch (error) {
             console.error('Error fetching leaderboard:', error);
-            await replyFunction(`Sorry, there was an error fetching the leaderboard: ${error.message}`, true); // Ephemeral error
+            if (interactionOrMessage.followUp) {
+                await interactionOrMessage.followUp({ content: `Sorry, there was an error fetching the leaderboard: ${error.message}`, flags: MessageFlags.Ephemeral });
+            } else {
+                await interactionOrMessage.channel.send(`Sorry, there was an error fetching the leaderboard: ${error.message}`);
+            }
         }
     },
 
     async prefixExecute(message, args) {
-        // Prefix commands don't use ephemeral replies in the same way as slash commands
-        await this.executeCommand((content, ephemeral) => {
-            if (content.embeds) {
-                return message.channel.send({ embeds: content.embeds });
-            }
-            return message.channel.send(content);
-        });
+        // Pass the message object directly
+        await this.executeCommand(message);
     },
 
     async slashExecute(interaction) {
         // DEFER REPLY IS REMOVED FROM HERE - IT'S NOW IN COMMANDHANDLER.JS
-        // await interaction.deferReply({ flags: 0 }); // This line is removed
-
-        // Pass interaction itself as replyFunction, so executeCommand can use defer/followUp
-        await this.executeCommand((content, ephemeral) => {
-            if (content.embeds) {
-                return interaction.followUp({ embeds: content.embeds, flags: ephemeral ? MessageFlags.Ephemeral : 0 });
-            }
-            return interaction.followUp({ content, flags: ephemeral ? MessageFlags.Ephemeral : 0 });
-        });
+        // Pass interaction directly
+        await this.executeCommand(interaction);
     },
 });
+�
