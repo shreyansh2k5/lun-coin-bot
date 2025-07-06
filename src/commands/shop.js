@@ -27,64 +27,114 @@ module.exports = (coinManager) => ({
                         .setRequired(true)
                         .setAutocomplete(true))), // Enable autocomplete for pet names
 
-    async executeCommand(userId, username, subcommand, petName, interaction) {
-        // Defer reply is handled by commandHandler.js
+    // Helper function to create the pet list embed
+    createPetListEmbed() {
+        const shopEmbed = new EmbedBuilder()
+            .setColor(0x00FF00) // Green color
+            .setTitle('🐾 Pet Shop 🐾')
+            .setDescription('Here are the adorable pets you can buy!')
+            .setTimestamp()
+            .setFooter({ text: 'Lun Coin Bot Shop' });
+
+        let description = '';
+        for (const pet in PET_PRICES) {
+            const { price, emoji } = PET_PRICES[pet];
+            description += `${emoji} **${pet.charAt(0).toUpperCase() + pet.slice(1)}**: **${price}** 💰\n`;
+        }
+
+        if (description) {
+            shopEmbed.addFields(
+                { name: 'Available Pets', value: description, inline: false },
+                { name: 'How to Buy', value: 'To purchase a pet, use `/shop buy <pet_name>` (e.g., `/shop buy dog`)', inline: false }
+            );
+        } else {
+            shopEmbed.setDescription('No pets available in the shop right now.');
+        }
+
+        return shopEmbed;
+    },
+
+    async executeCommand(userId, username, subcommand, petName, interactionOrMessage) {
+        // Defer reply is handled by commandHandler.js for slash commands
+        // For prefix, we reply directly.
 
         try {
-            if (subcommand === 'list') {
-                const shopEmbed = new EmbedBuilder()
-                    .setColor(0x00FF00) // Green color
-                    .setTitle('🐾 Pet Shop 🐾')
-                    .setDescription('Here are the adorable pets you can buy!')
-                    .setTimestamp()
-                    .setFooter({ text: 'Use /shop buy <pet_name> to purchase!' });
-
-                let description = '';
-                for (const pet in PET_PRICES) {
-                    const { price, emoji } = PET_PRICES[pet];
-                    description += `${emoji} **${pet.charAt(0).toUpperCase() + pet.slice(1)}**: **${price}** 💰\n`;
+            if (subcommand === 'list' || !subcommand) { // If no subcommand is provided (for prefix or default slash behavior)
+                const shopEmbed = this.createPetListEmbed();
+                if (interactionOrMessage.followUp) { // It's a slash interaction
+                    await interactionOrMessage.followUp({ embeds: [shopEmbed] });
+                } else { // It's a prefix message
+                    await interactionOrMessage.channel.send({ embeds: [shopEmbed] });
                 }
-                shopEmbed.setDescription(description || 'No pets available in the shop right now.');
-
-                await interaction.followUp({ embeds: [shopEmbed] });
 
             } else if (subcommand === 'buy') {
                 const petInfo = PET_PRICES[petName.toLowerCase()];
 
                 if (!petInfo) {
-                    return interaction.followUp({ content: `Sorry, '${petName}' is not a valid pet. Use \`/shop list\` to see available pets.`, flags: MessageFlags.Ephemeral });
+                    const errorMessage = `Sorry, '${petName}' is not a valid pet. Use \`/shop list\` to see available pets.`;
+                    if (interactionOrMessage.followUp) {
+                        return interactionOrMessage.followUp({ content: errorMessage, flags: MessageFlags.Ephemeral });
+                    } else {
+                        return interactionOrMessage.channel.send(errorMessage);
+                    }
                 }
 
                 const { price, emoji } = petInfo;
 
                 try {
                     const { newBalance, ownedPets } = await coinManager.buyPet(userId, petName.toLowerCase(), price);
-                    await interaction.followUp(`🎉 **${username}**, you successfully bought a **${petName.charAt(0).toUpperCase() + petName.slice(1)}** ${emoji} for **${price}** 💰! Your new balance is **${newBalance}** 💰. You now own ${ownedPets.length} pets.`);
+                    const successMessage = `🎉 **${username}**, you successfully bought a **${petName.charAt(0).toUpperCase() + petName.slice(1)}** ${emoji} for **${price}** 💰! Your new balance is **${newBalance}** 💰. You now own ${ownedPets.length} pets.`;
+                    if (interactionOrMessage.followUp) {
+                        await interactionOrMessage.followUp(successMessage);
+                    } else {
+                        await interactionOrMessage.channel.send(successMessage);
+                    }
                 } catch (buyError) {
                     let errorMessage = `Failed to buy ${petName}: ${buyError.message}`;
                     if (buyError.message.includes("Insufficient funds")) {
                         errorMessage = `You don't have enough coins to buy a **${petName.charAt(0).toUpperCase() + petName.slice(1)}**. You need **${price}** 💰.`;
                     }
-                    await interaction.followUp({ content: `Sorry ${username}, ${errorMessage}`, flags: MessageFlags.Ephemeral });
+                    if (interactionOrMessage.followUp) {
+                        await interactionOrMessage.followUp({ content: `Sorry ${username}, ${errorMessage}`, flags: MessageFlags.Ephemeral });
+                    } else {
+                        await interactionOrMessage.channel.send(`Sorry ${username}, ${errorMessage}`);
+                    }
                 }
             }
 
         } catch (error) {
             console.error(`Error in shop command for ${username}:`, error);
-            await interaction.followUp({ content: `Sorry ${username}, an unexpected error occurred: ${error.message}`, flags: MessageFlags.Ephemeral });
+            const errorMessage = `Sorry ${username}, an unexpected error occurred: ${error.message}`;
+            if (interactionOrMessage.followUp) {
+                await interactionOrMessage.followUp({ content: errorMessage, flags: MessageFlags.Ephemeral });
+            } else {
+                await interactionOrMessage.channel.send(errorMessage);
+            }
         }
     },
 
     async prefixExecute(message, args) {
-        return message.channel.send('The `$shop` command is only available as a slash command (`/shop`).');
+        // For prefix command, always show the list
+        await this.executeCommand(message.author.id, message.author.username, 'list', null, message);
     },
 
     async slashExecute(interaction) {
-        // Deferral is handled by commandHandler.js
-        const subcommand = interaction.options.getSubcommand();
+        try {
+            // Defer reply first for slash commands
+            await interaction.deferReply({ flags: 0 }); // Shop list should be public
+        } catch (deferError) {
+            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
+            }
+            return;
+        }
+
+        const subcommand = interaction.options.getSubcommand(false); // false means it can be null if no subcommand is provided
         const petName = interaction.options.getString('pet_name');
 
-        await this.executeCommand(interaction.user.id, interaction.user.username, subcommand, petName, interaction);
+        // If no subcommand is explicitly chosen (e.g., just /shop), default to 'list'
+        await this.executeCommand(interaction.user.id, interaction.user.username, subcommand || 'list', petName, interaction);
     },
 
     // Autocomplete handler for the 'buy' subcommand's 'pet_name' option
