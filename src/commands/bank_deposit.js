@@ -12,59 +12,70 @@ module.exports = (coinManager) => {
       .setDescription('Activate safe mode. You cannot be raided and cannot raid others for 24 hours.'),
 
     prefixExecute: async (message) => {
-      return message.reply('The `$bank_deposit` command is only available as a slash command.');
+      return message.reply('Use the slash command `/bank_deposit` instead.');
     },
 
     slashExecute: async (interaction) => {
+      const userId = interaction.user.id;
+      const username = interaction.user.username;
+
       try {
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-        const userId = interaction.user.id;
-        const username = interaction.user.username;
         const now = Date.now();
-
         const userData = await coinManager.getUserData(userId);
-        const lastDeposited = userData.lastBankDeposit;
 
-        const lastMs = lastDeposited instanceof admin.firestore.Timestamp
-          ? lastDeposited.toMillis()
-          : lastDeposited;
+        // Convert Firestore Timestamp to millis
+        const lastDepositedMs = userData.lastBankDeposit instanceof admin.firestore.Timestamp
+          ? userData.lastBankDeposit.toMillis()
+          : (typeof userData.lastBankDeposit === 'number' ? userData.lastBankDeposit : 0);
 
-        if (lastMs && (now - lastMs < BANK_DEPOSIT_COOLDOWN_MS)) {
-          const timeLeft = BANK_DEPOSIT_COOLDOWN_MS - (now - lastMs);
+        const timeSinceLastDeposit = now - lastDepositedMs;
+        const timeLeft = BANK_DEPOSIT_COOLDOWN_MS - timeSinceLastDeposit;
+
+        if (timeLeft > 0) {
           const hours = Math.floor(timeLeft / (1000 * 60 * 60));
           const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
           const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-          let timeStr = `${hours}h ${minutes}m ${seconds}s`.trim();
+
+          let timeString = '';
+          if (hours > 0) timeString += `${hours} hour(s) `;
+          if (minutes > 0) timeString += `${minutes} minute(s) `;
+          if (seconds > 0) timeString += `${seconds} second(s) `;
+          timeString = timeString.trim();
 
           return await interaction.editReply({
-            content: `⏳ You can deposit again in ${timeStr}.`,
+            content: `⏳ You can deposit again in ${timeString}.`,
             flags: MessageFlags.Ephemeral
           });
         }
 
         if (userData.isBanked) {
           return await interaction.editReply({
-            content: `⚠️ ${username}, you are already in safe mode.`,
+            content: `⚠️ ${username}, you are already in safe mode!`,
             flags: MessageFlags.Ephemeral
           });
         }
 
-        // ✅ Sets both isBanked + lastBankDeposit timestamp
+        // ✅ Set banked status and lastBankDeposit
         await coinManager.setBankedStatus(userId, true);
 
-        await interaction.editReply({
-          content: `🏦 **${username}**, safe mode activated! You are now safe from raids and cannot raid others. Use \`/bank_withdraw\` to disable.`,
+        return await interaction.editReply({
+          content: `✅ **${username}**, safe mode activated! You can't be raided and cannot raid others for 24 hours. Use \`/bank_withdraw\` to exit safe mode.`,
           flags: MessageFlags.Ephemeral
         });
 
       } catch (error) {
-        console.error('Failed to handle /bank_deposit:', error);
+        console.error(`Error in /bank_deposit for ${username}:`, error);
         if (!interaction.replied) {
-          await interaction.editReply({
-            content: `❌ Error while activating safe mode: ${error.message}`,
-            flags: MessageFlags.Ephemeral
-          }).catch(console.error);
+          try {
+            await interaction.editReply({
+              content: `❌ Error while processing your deposit: ${error.message}`,
+              flags: MessageFlags.Ephemeral
+            });
+          } catch (e) {
+            console.error("Failed to send fallback error message:", e);
+          }
         }
       }
     }
