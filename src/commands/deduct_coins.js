@@ -66,7 +66,17 @@ module.exports = (coinManager, client) => ({
     },
 
     async slashExecute(interaction) {
-        // DEFER REPLY IS REMOVED FROM HERE - IT'S NOW IN COMMANDHANDLER.JS
+        try {
+            // Defer reply first
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral }); // Admin command, should be ephemeral
+        } catch (deferError) {
+            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
+            }
+            return;
+        }
+
         const targetUser = interaction.options.getUser('target');
         const amount = interaction.options.getInteger('amount');
 
