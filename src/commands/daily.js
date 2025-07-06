@@ -1,11 +1,8 @@
 // src/commands/daily.js
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { DAILY_REWARD, DAILY_COOLDOWN_MS } = require('../config/gameConfig'); //
+const { DAILY_REWARD, DAILY_COOLDOWN_MS } = require('../config/gameConfig');
 
 const dailyCooldowns = new Map(); // Stores userId -> lastUsedTimestamp
-
-// const DAILY_REWARD = 5000; // Removed
-// const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds // Removed
 
 /**
  * Factory function to create the daily command.
@@ -19,12 +16,12 @@ module.exports = (coinManager) => ({
         .setName('daily')
         .setDescription(`Claim your daily ${DAILY_REWARD} coins! Usable once every 24 hours.`),
 
-    async executeCommand(userId, username, replyFunction) {
+    async executeCommand(userId, username, replyFunction) { // replyFunction here is a generic callback for prefix
         const now = Date.now();
         const lastUsed = dailyCooldowns.get(userId);
 
-        if (lastUsed && (now - lastUsed < DAILY_COOLDOWN_MS)) { //
-            const timeLeft = DAILY_COOLDOWN_MS - (now - lastUsed); //
+        if (lastUsed && (now - lastUsed < DAILY_COOLDOWN_MS)) {
+            const timeLeft = DAILY_COOLDOWN_MS - (now - lastUsed);
             const hours = Math.floor(timeLeft / (1000 * 60 * 60));
             const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
@@ -35,12 +32,11 @@ module.exports = (coinManager) => ({
             if (seconds > 0) timeString += `${seconds} second(s) `;
             timeString = timeString.trim();
 
-            // Use flags: MessageFlags.Ephemeral for ephemeral replies in slash commands
             return replyFunction(`${username}, you can claim your daily coins again in ${timeString}.`, true); // Pass true for ephemeral
         }
 
         try {
-            const newBalance = await coinManager.addCoins(userId, DAILY_REWARD); //
+            const newBalance = await coinManager.addCoins(userId, DAILY_REWARD);
             dailyCooldowns.set(userId, now); // Update last used timestamp
             await replyFunction(`🎉 ${username}, you claimed your daily **${DAILY_REWARD}** 💰! Your new balance is **${newBalance}** 💰.`); // Bold coins
         } catch (error) {
@@ -66,9 +62,34 @@ module.exports = (coinManager) => ({
             }
             return;
         }
-        
+
         const userId = interaction.user.id;
         const username = interaction.user.username;
-        await this.executeCommand(userId, username, (content, ephemeral) => interaction.followUp({ content, flags: ephemeral ? MessageFlags.Ephemeral : 0 }));
+        const now = Date.now();
+        const lastUsed = dailyCooldowns.get(userId);
+
+        if (lastUsed && (now - lastUsed < DAILY_COOLDOWN_MS)) {
+            const timeLeft = DAILY_COOLDOWN_MS - (now - lastUsed);
+            const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+            const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+            let timeString = '';
+            if (hours > 0) timeString += `${hours} hour(s) `;
+            if (minutes > 0) timeString += `${minutes} minute(s) `;
+            if (seconds > 0) timeString += `${seconds} second(s) `;
+            timeString = timeString.trim();
+
+            return interaction.followUp({ content: `${username}, you can claim your daily coins again in ${timeString}.`, flags: MessageFlags.Ephemeral });
+        }
+
+        try {
+            const newBalance = await coinManager.addCoins(userId, DAILY_REWARD);
+            dailyCooldowns.set(userId, now); // Update last used timestamp
+            await interaction.followUp(`🎉 ${username}, you claimed your daily **${DAILY_REWARD}** 💰! Your new balance is **${newBalance}** 💰.`);
+        } catch (error) {
+            console.error(`Error in /daily command for ${username}:`, error);
+            await interaction.followUp({ content: `Sorry ${username}, there was an error claiming your daily coins: ${error.message}`, flags: MessageFlags.Ephemeral });
+        }
     },
 });
