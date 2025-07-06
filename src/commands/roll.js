@@ -55,7 +55,17 @@ module.exports = (coinManager) => ({
     },
 
     async slashExecute(interaction) {
-        // DEFER REPLY IS REMOVED FROM HERE - IT'S NOW IN COMMANDHANDLER.JS
+        try {
+            // Defer reply first
+            await interaction.deferReply({ flags: 0 }); // Roll command should be public
+        } catch (deferError) {
+            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
+            }
+            return;
+        }
+
         const userId = interaction.user.id;
         const username = interaction.user.username;
         const amount = interaction.options.getInteger('amount');
