@@ -1,88 +1,72 @@
 // src/commands/help.js
-const { SlashCommandBuilder, MessageFlags, EmbedBuilder } = require('discord.js'); // Import EmbedBuilder
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 
 /**
  * Factory function to create the help command.
- * Needs access to other registered commands to list them.
- * @param {Map<string, object>} prefixCommandsMap A map of all registered prefix commands.
- * @param {Array<object>} slashCommandsDataArray An array of all registered slash command data.
- * @param {Map<string, object>} slashCommandsMap A map of all registered slash commands (for descriptions).
+ * @param {Collection} prefixCommands The collection of prefix commands.
+ * @param {Array} slashCommandsData The array of slash command data.
+ * @param {Collection} slashCommands The collection of slash command objects.
  * @returns {object} The command object.
  */
-module.exports = (prefixCommandsMap, slashCommandsDataArray, slashCommandsMap) => ({
+module.exports = (prefixCommands, slashCommandsData, slashCommands) => ({
     name: 'help',
-    description: 'Explains all commands, activities, and games.',
+    description: 'Lists all available commands.',
     slashCommandData: new SlashCommandBuilder()
         .setName('help')
-        .setDescription('Explains all commands, activities, and games.'),
+        .setDescription('Lists all available commands.'),
+
+    async executeCommand(interactionOrMessage) {
+        const helpEmbed = new EmbedBuilder()
+            .setColor(0x0099FF) // Blue color
+            .setTitle('📚 Bot Commands 📚')
+            .setDescription('Here are all the commands you can use:')
+            .setTimestamp()
+            .setFooter({ text: 'Lun Coin Bot Help' });
+
+        // Prefix Commands
+        let prefixCmds = '';
+        prefixCommands.forEach(cmd => {
+            if (cmd.prefixExecute) { // Only list commands that actually have a prefix executor
+                prefixCmds += `\`$${cmd.name}\` - ${cmd.description}\n`;
+            }
+        });
+        if (prefixCmds) {
+            helpEmbed.addFields({ name: 'Prefix Commands', value: prefixCmds, inline: false });
+        }
+
+        // Slash Commands
+        let slashCmds = '';
+        slashCommands.forEach(cmd => {
+            if (cmd.slashExecute) { // Only list commands that actually have a slash executor
+                slashCmds += `\`/${cmd.name}\` - ${cmd.description}\n`;
+            }
+        });
+        if (slashCmds) {
+            helpEmbed.addFields({ name: 'Slash Commands', value: slashCmds, inline: false });
+        }
+
+        if (interactionOrMessage.followUp) {
+            await interactionOrMessage.followUp({ embeds: [helpEmbed] });
+        } else {
+            await interactionOrMessage.channel.send({ embeds: [helpEmbed] });
+        }
+    },
 
     async prefixExecute(message, args) {
-        const helpEmbed = this.generateHelpEmbed(prefixCommandsMap, slashCommandsDataArray, slashCommandsMap);
-        await message.channel.send({ embeds: [helpEmbed] });
+        await this.executeCommand(message);
     },
 
     async slashExecute(interaction) {
-    try {
-        // Defer reply first to prevent "Unknown interaction" error
-        // Use flags: 0 for public replies, or MessageFlags.Ephemeral for private replies
-        await interaction.deferReply({ flags: 0 }); // Adjust flags based on whether the command's primary response should be public or private
-    } catch (deferError) {
-        console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
-        // If defer fails, try to reply ephemerally immediately as a last resort
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
+        try {
+            // Defer reply first
+            await interaction.deferReply({ flags: 0 }); // Help should be public
+        } catch (deferError) {
+            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
+            }
+            return;
         }
-        return; // Stop execution if deferral failed
-    }
-
-        const helpEmbed = this.generateHelpEmbed(prefixCommandsMap, slashCommandsDataArray, slashCommandsMap);
-        await interaction.followUp({ embeds: [helpEmbed], flags: 0 });
+        await this.executeCommand(interaction);
     },
-
-    generateHelpEmbed(prefixCommandsMap, slashCommandsDataArray, slashCommandsMap) {
-        const embed = new EmbedBuilder()
-            .setColor(0x0099FF) // A nice blue color
-            .setTitle('__Lun Coin Bot Commands & Activities__')
-            .setDescription('This bot allows users to earn and spend coins through various activities.')
-            .setTimestamp()
-            .setFooter({ text: 'More games and activities coming soon!' });
-
-        // --- Regular Commands ---
-        let regularCommandsField = '';
-        const processedCommands = new Set(); // To avoid duplicates if prefix and slash names are same
-
-        // Add prefix commands
-        prefixCommandsMap.forEach(cmd => {
-            if (!cmd.description.includes('[ADMIN]')) { // Exclude admin commands
-                regularCommandsField += `\`$${cmd.name}\` - ${cmd.description || 'No description provided.'}\n`;
-                processedCommands.add(cmd.name);
-            }
-        });
-
-        // Add slash commands that haven't been added yet (if their names are unique)
-        slashCommandsDataArray.forEach(cmdData => {
-            const cmd = slashCommandsMap.get(cmdData.name); // Get the full command object
-            if (cmd && !cmd.description.includes('[ADMIN]') && !processedCommands.has(cmdData.name)) {
-                regularCommandsField += `\`/${cmdData.name}\` - ${cmd.description || 'No description provided.'}\n`;
-                processedCommands.add(cmdData.name);
-            }
-        });
-
-        if (regularCommandsField) {
-            embed.addFields({ name: 'Commands', value: regularCommandsField, inline: false });
-        }
-
-        // --- Games & Activities ---
-        let gamesActivitiesField = '';
-        gamesActivitiesField += '💰 **Coin System**: Earn, lose, and transfer coins.\n';
-        gamesActivitiesField += '🎲 **`/flip <amount>` / `$flip <amount>`**: 50% chance to double your coins or lose them all.\n';
-        gamesActivitiesField += '🎰 **`/roll <amount>` / `$roll <amount>`**: Roll a dice, multiply your coins by 6 times if you win, or lose all.\n';
-        gamesActivitiesField += '📅 **`/daily` / `$daily`**: Get **5000** 💰 once every 24 hours.\n';
-        gamesActivitiesField += '乞 **`/beg` / `$beg`**: Get **1-1000** 💰, usable every 5 minutes.\n';
-        gamesActivitiesField += '🏆 **`/leaderboard` / `$leaderboard`**: See the top coin holders on the server.\n'; // NEW
-
-        embed.addFields({ name: 'Games & Activities', value: gamesActivitiesField, inline: false });
-
-        return embed;
-    }
 });
