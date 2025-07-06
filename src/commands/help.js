@@ -1,5 +1,6 @@
 // src/commands/help.js
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const { DAILY_REWARD, MIN_BEG_REWARD, MAX_BEG_REWARD } = require('../config/gameConfig'); // Import from gameConfig
 
 /**
  * Factory function to create the help command.
@@ -23,44 +24,62 @@ module.exports = (prefixCommands, slashCommandsData, slashCommands) => ({
             .setTimestamp()
             .setFooter({ text: 'Lun Coin Bot Help' });
 
-        // Commands Section
-        let commandsList = '';
         const excludedCommands = ['add_coins', 'deduct_coins']; // Commands to exclude from public help
 
-        // Iterate through all registered prefix commands
+        // --- Prefix Commands Section ---
+        let prefixCmdsValue = '';
         prefixCommands.forEach(cmd => {
             if (cmd.prefixExecute && !excludedCommands.includes(cmd.name)) {
-                commandsList += `\`$${cmd.name}\` - ${cmd.description}\n`;
+                const cmdLine = `\`$${cmd.name}\` - ${cmd.description}\n`;
+                if ((prefixCmdsValue + cmdLine).length <= 1024) { // Check length limit
+                    prefixCmdsValue += cmdLine;
+                } else {
+                    // If it exceeds, we could add another field, but for simplicity, we'll just stop
+                    // For now, assume it fits. If it still errors, we'd need multiple fields.
+                    console.warn(`Prefix commands list too long for single field. Truncating.`);
+                }
             }
         });
 
-        // Iterate through all registered slash commands (ensure no duplicates if both prefix/slash exist)
-        slashCommands.forEach(cmd => {
-            // Only add if it's a slash command and not already added via prefix, and not excluded
-            if (cmd.slashExecute && !commandsList.includes(`\`/${cmd.name}\``) && !excludedCommands.includes(cmd.name)) {
-                 commandsList += `\`/${cmd.name}\` - ${cmd.description}\n`;
-            }
-        });
-
-        if (commandsList) {
-            helpEmbed.addFields({ name: 'Commands', value: commandsList, inline: false });
+        if (prefixCmdsValue) {
+            helpEmbed.addFields({ name: 'Prefix Commands', value: prefixCmdsValue, inline: false });
         }
 
-        // Games & Activities Section (Manual listing for better formatting as per image)
+        // --- Slash Commands Section ---
+        let slashCmdsValue = '';
+        slashCommands.forEach(cmd => {
+            if (cmd.slashExecute && !excludedCommands.includes(cmd.name)) {
+                const cmdLine = `\`/${cmd.name}\` - ${cmd.description}\n`;
+                if ((slashCmdsValue + cmdLine).length <= 1024) { // Check length limit
+                    slashCmdsValue += cmdLine;
+                } else {
+                    // If it exceeds, we could add another field, but for simplicity, we'll just stop
+                    // For now, assume it fits. If it still errors, we'd need multiple fields.
+                    console.warn(`Slash commands list too long for single field. Truncating.`);
+                }
+            }
+        });
+
+        if (slashCmdsValue) {
+            helpEmbed.addFields({ name: 'Slash Commands', value: slashCmdsValue, inline: false });
+        }
+
+
+        // --- Games & Activities Section (Manual listing for better formatting as per image) ---
         const gamesActivities = `
 **Coin System:** Earn, lose, and transfer coins.
-\`/flip <amount>\` / \`$flip <amount>\`: 50% chance to double your coins or lose them all.
-\`/roll <amount>\` / \`$roll <amount>\`: Roll a dice, multiply your coins by 6 times if you win, or lose all.
-\`/daily\` / \`$daily\`: Get ${process.env.DAILY_REWARD || '5000'} 💰 once every 24 hours.
-\`/beg\` / \`$beg\`: Get ${process.env.MIN_BEG_REWARD || '1'}-${process.env.MAX_BEG_REWARD || '1000'} 💰, usable every 5 minutes.
-\`/leaderboard\` / \`$leaderboard\`: See the top coin holders on the server.
-\`/raid <@user>\`: Attempt to raid another user and steal their coins, or lose some of yours!
-\`/bank_deposit\`: Activate safe mode. You cannot be raided and cannot raid others for 24 hours.
-\`/bank_withdraw\`: Deactivate safe mode. You can now be raided and raid others.
-\`/shop\`: Browse and buy pets!
+\` /flip <amount>\` / \`$flip <amount>\`: 50% chance to double your coins or lose them all.
+\` /roll <amount>\` / \`$roll <amount>\`: Roll a dice, multiply your coins by 6 times if you win, or lose all.
+\` /daily\` / \`$daily\`: Get **${DAILY_REWARD}** 💰 once every 24 hours.
+\` /beg\` / \`$beg\`: Get **${MIN_BEG_REWARD}**-**${MAX_BEG_REWARD}** 💰, usable every 5 minutes.
+\` /leaderboard\` / \`$leaderboard\`: See the top coin holders on the server.
+\` /raid <@user>\`: Attempt to raid another user and steal their coins, or lose some of yours!
+\` /bank_deposit\`: Activate safe mode. You cannot be raided and cannot raid others for 24 hours.
+\` /bank_withdraw\`: Deactivate safe mode. You can now be raided and raid others.
+\` /shop\`: Browse and buy pets!
 `;
         helpEmbed.addFields({ name: 'Games & Activities', value: gamesActivities, inline: false });
-        helpEmbed.setDescription(helpEmbed.description + "\n\nMore games and activities coming soon!"); // Add "More games..." line
+        helpEmbed.setDescription(helpEmbed.description + "\n\nMore games and activities coming soon!");
 
         if (interactionOrMessage.followUp) {
             await interactionOrMessage.followUp({ embeds: [helpEmbed] });
