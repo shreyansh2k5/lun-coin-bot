@@ -1,5 +1,6 @@
 // src/commands/profile.js
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const { PET_PRICES } = require('../config/gameConfig'); // Import PET_PRICES
 
 /**
  * Factory function to create the profile command.
@@ -19,10 +20,29 @@ module.exports = (coinManager) => ({
 
     async executeCommand(targetId, targetUsername, targetAvatarURL, targetMember, interactionOrMessage) {
         try {
+            // Fetch coin data and pets for the target user
             const userData = await coinManager.getUserData(targetId);
             const coins = userData.coins;
             const isBanked = userData.isBanked;
+            const ownedPets = userData.pets; // Get owned pets
 
+            // Format pets for display
+            let petsString = 'No pets owned.';
+            if (ownedPets && ownedPets.length > 0) {
+                // Count occurrences of each pet
+                const petCounts = {};
+                ownedPets.forEach(pet => {
+                    petCounts[pet] = (petCounts[pet] || 0) + 1;
+                });
+
+                petsString = Object.keys(petCounts).map(petName => {
+                    const emoji = PET_PRICES[petName] ? PET_PRICES[petName].emoji : '❓'; // Get emoji or unknown
+                    const count = petCounts[petName];
+                    return `${emoji} ${petName.charAt(0).toUpperCase() + petName.slice(1)}${count > 1 ? ` (x${count})` : ''}`;
+                }).join('\n');
+            }
+
+            // Get roles if the command was run in a guild context and targetMember is available
             let rolesString = 'No roles found.';
             if (targetMember && targetMember.roles) {
                 const roles = targetMember.roles.cache
@@ -32,6 +52,7 @@ module.exports = (coinManager) => ({
                 rolesString = roles.length > 0 ? roles : 'No special roles.';
             }
 
+            // Create the embedded message
             const profileEmbed = new EmbedBuilder()
                 .setColor(0x0099FF)
                 .setTitle(`${targetUsername}'s Profile`)
@@ -39,6 +60,7 @@ module.exports = (coinManager) => ({
                 .addFields(
                     { name: '💰 Balance', value: `**${coins}** coins`, inline: true },
                     { name: '🔒 Safe Mode Status', value: isBanked ? 'Active (Cannot be raided)' : 'Inactive (Can be raided)', inline: true },
+                    { name: '🐾 Pets', value: petsString, inline: false }, // NEW: Display pets
                     { name: '🎭 Server Roles', value: rolesString, inline: false }
                 )
                 .setTimestamp()
@@ -72,7 +94,7 @@ module.exports = (coinManager) => ({
     },
 
     async slashExecute(interaction) {
-        // DEFER REPLY IS REMOVED FROM HERE - IT'S NOW IN COMMANDHANDLER.JS
+        // Deferral is handled by commandHandler.js
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const targetMember = interaction.options.getMember('user') || interaction.member;
 
