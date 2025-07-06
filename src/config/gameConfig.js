@@ -2,10 +2,10 @@
 
 module.exports = {
     // Coin System Defaults
-    DEFAULT_BALANCE: 5000,
+    DEFAULT_BALANCE: 10000,
 
     // Daily Command
-    DAILY_REWARD: 3000,
+    DAILY_REWARD: 5000,
     DAILY_COOLDOWN_MS: 24 * 60 * 60 * 1000, // 24 hours
 
     // Beg Command
@@ -25,10 +25,11 @@ module.exports = {
     RAID_MAX_PERCENTAGE: 0.25, // Max 25% of loser's balance
     RAID_COOLDOWN_MS: 1 * 60 * 60 * 1000, // 1 hour cooldown for raider
 
-    // Bank Toggle Command (Deposit/Withdraw)
-    BANK_TOGGLE_COOLDOWN_MS: 24 * 60 * 60 * 1000, // 24 hours cooldown for changing bank status
+    // Bank Deposit Command (NEW Cooldown)
+    BANK_DEPOSIT_COOLDOWN_MS: 24 * 60 * 60 * 1000, // 24 hours cooldown for deposit
+    // Bank Withdraw has no cooldown now
 
-    // Pet Shop (NEW)
+    // Pet Shop
     PET_PRICES: {
         dog: { price: 90000, emoji: '🐶' },
         cat: { price: 70000, emoji: '🐱' },
