@@ -1,6 +1,7 @@
 // src/commands/bank_deposit.js
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { BANK_DEPOSIT_COOLDOWN_MS } = require('../config/gameConfig'); // Use new constant
+const { BANK_DEPOSIT_COOLDOWN_MS } = require('../config/gameConfig');
+const admin = require('firebase-admin'); // NEW: Import firebase-admin
 
 // Remove the in-memory Map for cooldowns, as we're using Firestore
 // const bankToggleCooldowns = new Map();
