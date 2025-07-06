@@ -7,10 +7,10 @@ const raidCooldowns = new Map(); // Stores userId -> lastUsedTimestamp
 /**
  * Factory function to create the raid command.
  * @param {import('../services/coinManager')} coinManager The CoinManager instance.
- * @param {import('discord.js').Client} client The Discord client instance. // NEW: Added client
+ * @param {import('discord.js').Client} client The Discord client instance.
  * @returns {object} The command object.
  */
-module.exports = (coinManager, client) => ({ // NEW: Accept client
+module.exports = (coinManager, client) => ({
     name: 'raid',
     description: 'Attempt to raid another user and steal their coins, or lose some of yours!',
     slashCommandData: new SlashCommandBuilder()
@@ -22,7 +22,7 @@ module.exports = (coinManager, client) => ({ // NEW: Accept client
                 .setRequired(true)),
 
     async executeCommand(raiderId, raiderUsername, targetUser, interaction) {
-        // Defer reply is already handled in slashExecute, so no need to defer here again
+        // Defer reply is handled by slashExecute, so no need to defer here again
         const now = Date.now();
         const lastUsed = raidCooldowns.get(raiderId);
 
@@ -130,7 +130,17 @@ module.exports = (coinManager, client) => ({ // NEW: Accept client
     },
 
     async slashExecute(interaction) {
-        // Deferral is handled by commandHandler.js
+        try {
+            // Defer reply first
+            await interaction.deferReply({ flags: 0 }); // Raid results should be public
+        } catch (deferError) {
+            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
+            }
+            return;
+        }
+
         const raiderId = interaction.user.id;
         const raiderUsername = interaction.user.username;
         const targetUser = interaction.options.getUser('target');
