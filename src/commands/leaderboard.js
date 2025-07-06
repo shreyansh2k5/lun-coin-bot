@@ -75,7 +75,18 @@ module.exports = (coinManager, client) => ({
     },
 
     async slashExecute(interaction) {
-        // DEFER REPLY IS REMOVED FROM HERE - IT'S NOW IN COMMANDHANDLER.JS
+        try {
+            // Defer reply first to prevent "Unknown interaction" error
+            // This command can take time, so defer it here.
+            await interaction.deferReply({ flags: 0 }); // Leaderboard should be public
+        } catch (deferError) {
+            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
+            }
+            return;
+        }
+
         // Pass interaction directly
         await this.executeCommand(interaction);
     },
