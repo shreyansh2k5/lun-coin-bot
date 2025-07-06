@@ -80,4 +80,3 @@ module.exports = (coinManager, client) => ({
         await this.executeCommand(interaction);
     },
 });
-�
