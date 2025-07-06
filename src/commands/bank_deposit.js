@@ -1,6 +1,8 @@
 // src/commands/bank_deposit.js
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { BANK_DEPOSIT_COOLDOWN_MS } = require('../config/gameConfig'); // Use new constant
+const { BANK_DEPOSIT_COOLDOWN_MS } = require('../config/gameConfig');
+
+const bankToggleCooldowns = new Map(); // Stores userId -> lastUsedTimestamp for bank toggle
 
 /**
  * Factory function to create the bank_deposit command.
