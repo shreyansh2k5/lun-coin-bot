@@ -37,7 +37,7 @@ module.exports = {
         parrot: { price: 8000, emoji: '🦜' },
         horse: { price: 25000, emoji: '🐎' },
         squirrel: { price: 7000, emoji: '🐿️' },
-        goldfish: { price: 5000, emoji: ' goldfish' }, // Note: Goldfish emoji might render as fish
+        goldfish: { price: 5000, emoji: '🐠' },
         eagle: { price: 50000, emoji: '🦅' },
         lion: { price: 80000, emoji: '🦁' },
         tiger: { price: 100000, emoji: '🐯' },
