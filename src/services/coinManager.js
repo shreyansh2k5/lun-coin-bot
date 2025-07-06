@@ -1,6 +1,6 @@
 // src/services/coinManager.js
 const { DEFAULT_BALANCE, PET_PRICES } = require('../config/gameConfig');
-const admin = require('firebase-admin');
+const admin = require('firebase-admin'); // Ensure admin is imported
 const { FieldValue } = admin.firestore;
 
 class CoinManager {
@@ -9,7 +9,7 @@ class CoinManager {
         this.usersCollection = 'users'; // Name of the Firestore collection for users
         this.coinsField = 'coins';     // Name of the field storing coin balance
         this.isBankedField = 'isBanked';       // Field to indicate if user is in safe mode
-        this.lastBankDepositField = 'lastBankDeposit'; // NEW: Timestamp for last deposit action
+        this.lastBankDepositField = 'lastBankDeposit'; // Timestamp for last deposit action
         this.petsField = 'pets'; // Field for user's owned pets (array of strings)
         this.defaultBalance = DEFAULT_BALANCE;   // Default balance for new users
     }
@@ -20,7 +20,7 @@ class CoinManager {
      * and initialized with the default balance.
      *
      * @param {string} userId The Discord user ID.
-     * @returns {Promise<{coins: number, isBanked: boolean, lastBankDeposit: number, pets: string[]}>} A Promise that resolves with the user's data.
+     * @returns {Promise<{coins: number, isBanked: boolean, lastBankDeposit: number | admin.firestore.Timestamp, pets: string[]}>} A Promise that resolves with the user's data.
      */
     async getUserData(userId) {
         try {
@@ -32,8 +32,8 @@ class CoinManager {
                 return {
                     coins: typeof data[this.coinsField] === 'number' ? data[this.coinsField] : 0,
                     isBanked: typeof data[this.isBankedField] === 'boolean' ? data[this.isBankedField] : false,
-                    lastBankDeposit: typeof data[this.lastBankDepositField] === 'number' ? data[this.lastBankDepositField] : 0, // Use new field
-                    pets: Array.isArray(data[this.petsField]) ? data[this.petsField] : [],
+                    lastBankDeposit: data[this.lastBankDepositField] || 0, // Can be Timestamp or number
+                    pets: Array.isArray(data[this.petsField]) ? data[this.petsField] : [], // Ensure pets is an array
                 };
             } else {
                 // User does not exist, initialize with default balance and bank status
@@ -41,7 +41,7 @@ class CoinManager {
                     [this.coinsField]: this.defaultBalance,
                     [this.isBankedField]: false,
                     [this.lastBankDepositField]: 0, // Initialize new field
-                    [this.petsField]: [],
+                    [this.petsField]: [], // Initialize with empty array
                 };
                 await userRef.set(initialData);
                 return initialData;
@@ -182,25 +182,22 @@ class CoinManager {
      * @throws {Error} If update fails.
      */
     async setBankedStatus(userId, status) {
-    try {
-        const userRef = this.db.collection(this.usersCollection).doc(userId);
-        const updateData = {
-            [this.isBankedField]: status,
-        };
-        // ✅ Set server timestamp only when depositing (status === true)
-        if (status === true) {
-            updateData[this.lastBankDepositField] = admin.firestore.FieldValue.serverTimestamp();
+        try {
+            const userRef = this.db.collection(this.usersCollection).doc(userId);
+            const updateData = {
+                [this.isBankedField]: status,
+            };
+            // Only update lastBankDeposit when setting status to true (depositing)
+            if (status === true) {
+                updateData[this.lastBankDepositField] = FieldValue.serverTimestamp();
+            }
+            await userRef.update(updateData);
+            return status;
+        } catch (error) {
+            console.error(`Error setting banked status for user ${userId} to ${status}:`, error.message);
+            throw error;
         }
-        // ✅ Merge instead of update — safe for both new and existing users
-        await userRef.set(updateData, { merge: true });
-
-        return status;
-    } catch (error) {
-        console.error(`Error setting banked status for user ${userId} to ${status}:`, error.message);
-        throw error;
     }
-}
-
 
     /**
      * Allows a user to buy a pet.
