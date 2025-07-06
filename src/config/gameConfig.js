@@ -27,4 +27,19 @@ module.exports = {
 
     // Bank Toggle Command (Deposit/Withdraw)
     BANK_TOGGLE_COOLDOWN_MS: 24 * 60 * 60 * 1000, // 24 hours cooldown for changing bank status
+
+    // Pet Shop (NEW)
+    PET_PRICES: {
+        dog: { price: 5000, emoji: '🐶' },
+        cat: { price: 4500, emoji: '🐱' },
+        hamster: { price: 1500, emoji: '🐹' },
+        rabbit: { price: 2000, emoji: '🐰' },
+        parrot: { price: 7000, emoji: '🦜' },
+        horse: { price: 15000, emoji: '🐎' },
+        squirrel: { price: 2500, emoji: '🐿️' },
+        goldfish: { price: 1000, emoji: ' goldfish' }, // Note: Goldfish emoji might render as fish
+        eagle: { price: 10000, emoji: '🦅' },
+        lion: { price: 20000, emoji: '🦁' },
+        tiger: { price: 22000, emoji: '🐯' },
+    },
 };
