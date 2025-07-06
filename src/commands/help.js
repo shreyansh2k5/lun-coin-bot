@@ -26,42 +26,50 @@ module.exports = (prefixCommands, slashCommandsData, slashCommands) => ({
 
         const excludedCommands = ['add_coins', 'deduct_coins']; // Commands to exclude from public help
 
-        // --- Prefix Commands Section ---
-        let prefixCmdsValue = '';
+        // --- Unified Commands Section ---
+        let allCommandsValue = '';
+        const processedCommandNames = new Set(); // To avoid duplicates if a command is both prefix and slash
+
+        // Iterate through all registered prefix commands first
         prefixCommands.forEach(cmd => {
-            if (cmd.prefixExecute && !excludedCommands.includes(cmd.name)) {
-                const cmdLine = `\`$${cmd.name}\` - ${cmd.description}\n`;
-                if ((prefixCmdsValue + cmdLine).length <= 1024) { // Check length limit
-                    prefixCmdsValue += cmdLine;
-                } else {
-                    // If it exceeds, we could add another field, but for simplicity, we'll just stop
-                    // For now, assume it fits. If it still errors, we'd need multiple fields.
-                    console.warn(`Prefix commands list too long for single field. Truncating.`);
+            if (!excludedCommands.includes(cmd.name) && !processedCommandNames.has(cmd.name)) {
+                let cmdLine = '';
+                const hasPrefix = typeof cmd.prefixExecute === 'function';
+                const hasSlash = typeof cmd.slashExecute === 'function';
+
+                if (hasPrefix && hasSlash) {
+                    cmdLine = `**\`/${cmd.name}\` / \`$${cmd.name}\`** - ${cmd.description}\n`;
+                } else if (hasPrefix) {
+                    cmdLine = `**\`$${cmd.name}\`** - ${cmd.description}\n`;
+                } else if (hasSlash) { // Should ideally be covered by slashCommands iteration, but for completeness
+                    cmdLine = `**\`/${cmd.name}\`** - ${cmd.description}\n`;
+                }
+
+                if (cmdLine && (allCommandsValue + cmdLine).length <= 1024) { // Check length limit
+                    allCommandsValue += cmdLine;
+                    processedCommandNames.add(cmd.name);
+                } else if (cmdLine) {
+                    console.warn(`Commands list too long for single field. Truncating.`);
                 }
             }
         });
 
-        if (prefixCmdsValue) {
-            helpEmbed.addFields({ name: 'Prefix Commands', value: prefixCmdsValue, inline: false });
-        }
-
-        // --- Slash Commands Section ---
-        let slashCmdsValue = '';
+        // Add any slash-only commands that weren't caught by prefixCommands iteration
         slashCommands.forEach(cmd => {
-            if (cmd.slashExecute && !excludedCommands.includes(cmd.name)) {
-                const cmdLine = `\`/${cmd.name}\` - ${cmd.description}\n`;
-                if ((slashCmdsValue + cmdLine).length <= 1024) { // Check length limit
-                    slashCmdsValue += cmdLine;
+            if (!excludedCommands.includes(cmd.name) && !processedCommandNames.has(cmd.name)) {
+                const cmdLine = `**\`/${cmd.name}\`** - ${cmd.description}\n`;
+                if ((allCommandsValue + cmdLine).length <= 1024) { // Check length limit
+                    allCommandsValue += cmdLine;
+                    processedCommandNames.add(cmd.name);
                 } else {
-                    // If it exceeds, we could add another field, but for simplicity, we'll just stop
-                    // For now, assume it fits. If it still errors, we'd need multiple fields.
-                    console.warn(`Slash commands list too long for single field. Truncating.`);
+                    console.warn(`Commands list too long for single field. Truncating.`);
                 }
             }
         });
 
-        if (slashCmdsValue) {
-            helpEmbed.addFields({ name: 'Slash Commands', value: slashCmdsValue, inline: false });
+
+        if (allCommandsValue) {
+            helpEmbed.addFields({ name: 'Commands', value: allCommandsValue, inline: false });
         }
 
 
