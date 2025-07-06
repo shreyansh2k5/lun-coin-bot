@@ -14,9 +14,10 @@ const addCoinsCommand = require('./add_coins');
 const deductCoinsCommand = require('./deduct_coins');
 const leaderboardCommand = require('./leaderboard');
 const profileCommand = require('./profile');
-const raidCommand = require('./raid'); // Make sure this is imported
+const raidCommand = require('./raid');
 const bankDepositCommand = require('./bank_deposit');
 const bankWithdrawCommand = require('./bank_withdraw');
+const shopCommand = require('./shop'); // NEW: Import the shop command
 
 // Maps to store commands, accessible by their name
 const prefixCommands = new Collection();
@@ -61,9 +62,10 @@ function registerAllCommands(coinManager, client) {
     registerCommand(deductCoinsCommand(coinManager, client));
     registerCommand(leaderboardCommand(coinManager, client));
     registerCommand(profileCommand(coinManager));
-    registerCommand(raidCommand(coinManager, client)); // NEW: Pass client here
+    registerCommand(raidCommand(coinManager, client));
     registerCommand(bankDepositCommand(coinManager));
     registerCommand(bankWithdrawCommand(coinManager));
+    registerCommand(shopCommand(coinManager)); // NEW: Register the shop command
 
     console.log(`Registered ${prefixCommands.size} prefix commands.`);
     console.log(`Registered ${slashCommands.size} slash commands.`);
@@ -113,19 +115,17 @@ async function handleSlashCommand(interaction, coinManager, client) {
     }
 
     try {
-        const ephemeralDefault = ['bank_deposit', 'bank_withdraw'].includes(interaction.commandName);
-        await interaction.deferReply({ flags: ephemeralDefault ? MessageFlags.Ephemeral : 0 });
-
-        await command.slashExecute(interaction, coinManager, client); // Pass client here
+        // IMPORTANT: Deferral is now handled by individual command's slashExecute method.
+        // This command handler just passes the interaction.
+        await command.slashExecute(interaction, coinManager, client);
     } catch (error) {
-        console.error(`Error in handleSlashCommand for /${interaction.commandName}:`, error);
-
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: `An unexpected error occurred: ${error.message}`, flags: MessageFlags.Ephemeral })
-                .catch(e => console.error("Failed to send initial error reply:", e));
-        } else {
+        console.error(`Error executing slash command /${interaction.commandName}:`, error);
+        if (interaction.replied || interaction.deferred) {
             await interaction.followUp({ content: `An error occurred during command execution: ${error.message}`, flags: MessageFlags.Ephemeral })
                 .catch(e => console.error("Failed to send followUp error message:", e));
+        } else {
+            await interaction.reply({ content: `An unexpected error occurred: ${error.message}`, flags: MessageFlags.Ephemeral })
+                .catch(e => console.error("Failed to send initial error reply:", e));
         }
     }
 }
