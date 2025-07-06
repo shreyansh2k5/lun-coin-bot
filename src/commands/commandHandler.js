@@ -17,6 +17,7 @@ const profileCommand = require('./profile');
 const raidCommand = require('./raid');
 const bankDepositCommand = require('./bank_deposit');
 const bankWithdrawCommand = require('./bank_withdraw');
+const shopCommand = require('./shop'); // Import the shop command
 
 // Maps to store commands, accessible by their name
 const prefixCommands = new Collection();
@@ -64,6 +65,7 @@ function registerAllCommands(coinManager, client) {
     registerCommand(raidCommand(coinManager, client));
     registerCommand(bankDepositCommand(coinManager));
     registerCommand(bankWithdrawCommand(coinManager));
+    registerCommand(shopCommand(coinManager)); // Register the shop command
 
     console.log(`Registered ${prefixCommands.size} prefix commands.`);
     console.log(`Registered ${slashCommands.size} slash commands.`);
