@@ -67,25 +67,26 @@ module.exports = (coinManager) => ({
   },
 
   async slashExecute(interaction) {
-    try {
-      await interaction.deferReply({ ephemeral: true }); // ⚠️ Ensure you defer WITH `ephemeral: true` if you plan to use ephemeral flags later
-      const userId = interaction.user.id;
-      const username = interaction.user.username;
+  try {
+    await interaction.deferReply({ ephemeral: true }); // ✅ Correct way to defer with ephemeral
 
-      await this.executeCommand(userId, username, interaction);
-    } catch (err) {
-      console.error("Error during slashExecute of /bank_deposit:", err);
-      if (interaction.deferred) {
-        await interaction.editReply({
-          content: "❌ Something went wrong while processing your deposit.",
-          flags: MessageFlags.Ephemeral
-        });
-      } else {
+    const userId = interaction.user.id;
+    const username = interaction.user.username;
+
+    await executeCommand(userId, username, interaction);
+  } catch (err) {
+    console.error(`Failed to handle /${interaction.commandName}:`, err);
+
+    if (!interaction.deferred && !interaction.replied) {
+      try {
         await interaction.reply({
-          content: "❌ Something went wrong while processing your deposit.",
+          content: "⚠️ I took too long to respond. Please try again.",
           ephemeral: true
         });
+      } catch (replyError) {
+        console.error("Failed to send fallback error:", replyError);
       }
     }
   }
+}
 });
