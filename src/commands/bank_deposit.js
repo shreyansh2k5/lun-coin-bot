@@ -1,10 +1,7 @@
 // src/commands/bank_deposit.js
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { BANK_DEPOSIT_COOLDOWN_MS } = require('../config/gameConfig');
-const admin = require('firebase-admin'); // NEW: Import firebase-admin
-
-// Remove the in-memory Map for cooldowns, as we're using Firestore
-// const bankToggleCooldowns = new Map();
+const admin = require('firebase-admin'); // Ensure admin is imported for Timestamp check
 
 /**
  * Factory function to create the bank_deposit command.
@@ -24,13 +21,10 @@ module.exports = (coinManager) => ({
 
         try {
             const userData = await coinManager.getUserData(userId);
-            const lastDeposited = userData.lastBankDeposit; // Get last deposit timestamp from Firestore
+            const lastDeposited = userData.lastBankDeposit;
 
             // Cooldown check for deposit using Firestore timestamp
-            // lastDeposited can be a Firestore Timestamp object or a number (if it was from Date.now())
-            // Convert to milliseconds if it's a Firestore Timestamp
             const lastDepositedMs = lastDeposited instanceof admin.firestore.Timestamp ? lastDeposited.toMillis() : lastDeposited;
-
 
             if (lastDepositedMs && (now - lastDepositedMs < BANK_DEPOSIT_COOLDOWN_MS)) {
                 const timeLeft = BANK_DEPOSIT_COOLDOWN_MS - (now - lastDepositedMs);
@@ -51,7 +45,6 @@ module.exports = (coinManager) => ({
                 return interaction.followUp({ content: `${username}, you are already in safe mode!`, flags: MessageFlags.Ephemeral });
             }
 
-            // setBankedStatus will update the lastBankDeposit timestamp in Firestore
             await coinManager.setBankedStatus(userId, true);
 
             await interaction.followUp({ content: `🏦 **${username}**, you have activated safe mode! You are now safe from raids and cannot raid others. You can use \`/bank_withdraw\` anytime to deactivate.`, flags: MessageFlags.Ephemeral });
