@@ -3,20 +3,14 @@ const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { BANK_DEPOSIT_COOLDOWN_MS } = require('../config/gameConfig');
 const admin = require('firebase-admin');
 
-module.exports = (coinManager) => ({
-  name: 'bank_deposit',
-  description: 'Activate safe mode. You cannot be raided and cannot raid others for 24 hours.',
-  slashCommandData: new SlashCommandBuilder()
-    .setName('bank_deposit')
-    .setDescription('Activate safe mode. You cannot be raided and cannot raid others for 24 hours.'),
-
-  async executeCommand(userId, username, interaction) {
+module.exports = (coinManager) => {
+  // ✅ Define this once, in closure scope so it's accessible
+  const executeCommand = async (userId, username, interaction) => {
     const now = Date.now();
 
     try {
       const userData = await coinManager.getUserData(userId);
       const lastDeposited = userData.lastBankDeposit;
-
       const lastDepositedMs = lastDeposited instanceof admin.firestore.Timestamp
         ? lastDeposited.toMillis()
         : lastDeposited;
@@ -60,33 +54,41 @@ module.exports = (coinManager) => ({
         flags: MessageFlags.Ephemeral
       });
     }
-  },
+  };
 
-  async prefixExecute(message, args) {
-    return message.channel.send('The `$bank_deposit` command is only available as a slash command (`/bank_deposit`).');
-  },
+  return {
+    name: 'bank_deposit',
+    description: 'Activate safe mode. You cannot be raided and cannot raid others for 24 hours.',
+    slashCommandData: new SlashCommandBuilder()
+      .setName('bank_deposit')
+      .setDescription('Activate safe mode. You cannot be raided and cannot raid others for 24 hours.'),
 
-  async slashExecute(interaction) {
-  try {
-    await interaction.deferReply({ ephemeral: true }); // ✅ Correct way to defer with ephemeral
+    prefixExecute: async (message, args) => {
+      return message.channel.send('The `$bank_deposit` command is only available as a slash command (`/bank_deposit`).');
+    },
 
-    const userId = interaction.user.id;
-    const username = interaction.user.username;
-
-    await executeCommand(userId, username, interaction);
-  } catch (err) {
-    console.error(`Failed to handle /${interaction.commandName}:`, err);
-
-    if (!interaction.deferred && !interaction.replied) {
+    slashExecute: async (interaction) => {
       try {
-        await interaction.reply({
-          content: "⚠️ I took too long to respond. Please try again.",
-          ephemeral: true
-        });
-      } catch (replyError) {
-        console.error("Failed to send fallback error:", replyError);
+        await interaction.deferReply({ ephemeral: true }); // ✅ Use ephemeral this way
+
+        const userId = interaction.user.id;
+        const username = interaction.user.username;
+
+        await executeCommand(userId, username, interaction);
+      } catch (err) {
+        console.error(`Failed to handle /bank_deposit:`, err);
+
+        if (!interaction.deferred && !interaction.replied) {
+          try {
+            await interaction.reply({
+              content: '⚠️ I took too long to respond. Please try again.',
+              ephemeral: true
+            });
+          } catch (replyErr) {
+            console.error("Failed to send fallback error:", replyErr);
+          }
+        }
       }
     }
-  }
-}
-});
+  };
+};
