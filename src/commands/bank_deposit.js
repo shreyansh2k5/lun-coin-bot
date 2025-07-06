@@ -1,4 +1,3 @@
-// src/commands/bank_deposit.js
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { BANK_DEPOSIT_COOLDOWN_MS } = require('../config/gameConfig');
 const admin = require('firebase-admin');
@@ -19,63 +18,63 @@ module.exports = (coinManager) => {
       const userId = interaction.user.id;
       const username = interaction.user.username;
 
+      let hasDeferred = false;
       try {
+        // 🟢 Always defer within 3 seconds
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        hasDeferred = true;
 
         const now = Date.now();
         const userData = await coinManager.getUserData(userId);
 
-        // Convert Firestore Timestamp to millis
         const lastDepositedMs = userData.lastBankDeposit instanceof admin.firestore.Timestamp
           ? userData.lastBankDeposit.toMillis()
           : (typeof userData.lastBankDeposit === 'number' ? userData.lastBankDeposit : 0);
 
-        const timeSinceLastDeposit = now - lastDepositedMs;
-        const timeLeft = BANK_DEPOSIT_COOLDOWN_MS - timeSinceLastDeposit;
-
+        const timeLeft = BANK_DEPOSIT_COOLDOWN_MS - (now - lastDepositedMs);
         if (timeLeft > 0) {
-          const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-          const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-          const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-
-          let timeString = '';
-          if (hours > 0) timeString += `${hours} hour(s) `;
-          if (minutes > 0) timeString += `${minutes} minute(s) `;
-          if (seconds > 0) timeString += `${seconds} second(s) `;
-          timeString = timeString.trim();
+          const h = Math.floor(timeLeft / 3600000);
+          const m = Math.floor((timeLeft % 3600000) / 60000);
+          const s = Math.floor((timeLeft % 60000) / 1000);
+          const timeStr = `${h ? `${h}h ` : ''}${m ? `${m}m ` : ''}${s}s`.trim();
 
           return await interaction.editReply({
-            content: `⏳ You can deposit again in ${timeString}.`,
+            content: `⏳ You can deposit again in ${timeStr}.`,
             flags: MessageFlags.Ephemeral
           });
         }
 
         if (userData.isBanked) {
           return await interaction.editReply({
-            content: `⚠️ ${username}, you are already in safe mode!`,
+            content: `⚠️ ${username}, you're already in safe mode!`,
             flags: MessageFlags.Ephemeral
           });
         }
 
-        // ✅ Set banked status and lastBankDeposit
         await coinManager.setBankedStatus(userId, true);
 
         return await interaction.editReply({
-          content: `✅ **${username}**, safe mode activated! You can't be raided and cannot raid others for 24 hours. Use \`/bank_withdraw\` to exit safe mode.`,
+          content: `✅ ${username}, safe mode is now active! You can't be raided or raid others for 24 hours.\nUse \`/bank_withdraw\` to disable safe mode.`,
           flags: MessageFlags.Ephemeral
         });
 
-      } catch (error) {
-        console.error(`Error in /bank_deposit for ${username}:`, error);
-        if (!interaction.replied) {
-          try {
+      } catch (err) {
+        console.error(`Error in /bank_deposit for ${username}:`, err);
+
+        try {
+          if (hasDeferred && !interaction.replied) {
             await interaction.editReply({
-              content: `❌ Error while processing your deposit: ${error.message}`,
+              content: '❌ An error occurred. Please try again later.',
               flags: MessageFlags.Ephemeral
             });
-          } catch (e) {
-            console.error("Failed to send fallback error message:", e);
+          } else if (!hasDeferred && !interaction.replied) {
+            await interaction.reply({
+              content: '❌ Something went wrong before I could respond.',
+              flags: MessageFlags.Ephemeral
+            });
           }
+        } catch (e) {
+          console.error("⚠️ Failed to send fallback error:", e);
         }
       }
     }
