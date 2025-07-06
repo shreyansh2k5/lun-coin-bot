@@ -2,7 +2,7 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { BANK_TOGGLE_COOLDOWN_MS } = require('../config/gameConfig');
 
-const bankToggleCooldowns = new Map(); // Stores userId -> lastUsedTimestamp for bank toggle (same cooldown as deposit)
+const bankToggleCooldowns = new Map(); // Stores userId -> lastUsedTimestamp for bank toggle
 
 /**
  * Factory function to create the bank_withdraw command.
@@ -16,9 +16,8 @@ module.exports = (coinManager) => ({
         .setName('bank_withdraw')
         .setDescription('Deactivate safe mode. You can now be raided and raid others.'),
 
-    // interaction is passed directly here
     async executeCommand(userId, username, interaction) {
-        // Defer reply is already handled in slashExecute (by commandHandler), so no need to defer here again
+        // Defer reply is handled by slashExecute, so no need to defer here again
         const now = Date.now();
         const lastUsed = bankToggleCooldowns.get(userId);
 
@@ -60,7 +59,16 @@ module.exports = (coinManager) => ({
     },
 
     async slashExecute(interaction) {
-        // DEFER REPLY IS REMOVED FROM HERE - IT'S NOW IN COMMANDHANDLER.JS
+        try {
+            // Defer reply first
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral }); // Bank commands are personal
+        } catch (deferError) {
+            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
+            }
+            return;
+        }
         await this.executeCommand(interaction.user.id, interaction.user.username, interaction);
     },
 });
