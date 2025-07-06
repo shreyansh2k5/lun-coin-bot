@@ -1,8 +1,9 @@
 // src/commands/bank_deposit.js
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { BANK_DEPOSIT_COOLDOWN_MS } = require('../config/gameConfig');
+const { BANK_DEPOSIT_COOLDOWN_MS } = require('../config/gameConfig'); // Use new constant
 
-const bankToggleCooldowns = new Map(); // Stores userId -> lastUsedTimestamp for bank toggle
+// Remove the in-memory Map for cooldowns, as we're using Firestore
+// const bankToggleCooldowns = new Map();
 
 /**
  * Factory function to create the bank_deposit command.
@@ -22,11 +23,16 @@ module.exports = (coinManager) => ({
 
         try {
             const userData = await coinManager.getUserData(userId);
-            const lastDeposited = userData.lastBankDeposit; // Get last deposit timestamp
+            const lastDeposited = userData.lastBankDeposit; // Get last deposit timestamp from Firestore
 
-            // Cooldown check for deposit
-            if (lastDeposited && (now - lastDeposited < BANK_DEPOSIT_COOLDOWN_MS)) {
-                const timeLeft = BANK_DEPOSIT_COOLDOWN_MS - (now - lastDeposited);
+            // Cooldown check for deposit using Firestore timestamp
+            // lastDeposited can be a Firestore Timestamp object or a number (if it was from Date.now())
+            // Convert to milliseconds if it's a Firestore Timestamp
+            const lastDepositedMs = lastDeposited instanceof admin.firestore.Timestamp ? lastDeposited.toMillis() : lastDeposited;
+
+
+            if (lastDepositedMs && (now - lastDepositedMs < BANK_DEPOSIT_COOLDOWN_MS)) {
+                const timeLeft = BANK_DEPOSIT_COOLDOWN_MS - (now - lastDepositedMs);
                 const hours = Math.floor(timeLeft / (1000 * 60 * 60));
                 const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
                 const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
@@ -44,8 +50,8 @@ module.exports = (coinManager) => ({
                 return interaction.followUp({ content: `${username}, you are already in safe mode!`, flags: MessageFlags.Ephemeral });
             }
 
-            await coinManager.setBankedStatus(userId, true); // This will update lastBankDeposit in coinManager
-            // No need to set cooldown in Map here, as it's handled by Firestore timestamp
+            // setBankedStatus will update the lastBankDeposit timestamp in Firestore
+            await coinManager.setBankedStatus(userId, true);
 
             await interaction.followUp({ content: `🏦 **${username}**, you have activated safe mode! You are now safe from raids and cannot raid others. You can use \`/bank_withdraw\` anytime to deactivate.`, flags: MessageFlags.Ephemeral });
 
