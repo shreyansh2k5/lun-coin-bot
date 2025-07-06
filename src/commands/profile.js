@@ -19,6 +19,7 @@ module.exports = (coinManager) => ({
                 .setRequired(false)), // Not required, defaults to self
 
     async executeCommand(targetId, targetUsername, targetAvatarURL, targetMember, interactionOrMessage) {
+        // Deferral is handled in slashExecute, so no defer here.
         try {
             // Fetch coin data and pets for the target user
             const userData = await coinManager.getUserData(targetId);
@@ -94,7 +95,17 @@ module.exports = (coinManager) => ({
     },
 
     async slashExecute(interaction) {
-        // Deferral is handled by commandHandler.js
+        try {
+            // Defer reply first
+            await interaction.deferReply({ flags: 0 }); // Profile command should be public
+        } catch (deferError) {
+            console.error(`Failed to defer reply for /${interaction.commandName}:`, deferError);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: 'Sorry, I took too long to respond. Please try again.', flags: MessageFlags.Ephemeral }).catch(e => console.error("Failed to send timeout error:", e));
+            }
+            return;
+        }
+
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const targetMember = interaction.options.getMember('user') || interaction.member;
 
