@@ -30,16 +30,16 @@ module.exports = {
 
     // Pet Shop (NEW)
     PET_PRICES: {
-        dog: { price: 5000, emoji: '🐶' },
-        cat: { price: 4500, emoji: '🐱' },
-        hamster: { price: 1500, emoji: '🐹' },
-        rabbit: { price: 2000, emoji: '🐰' },
-        parrot: { price: 7000, emoji: '🦜' },
-        horse: { price: 15000, emoji: '🐎' },
-        squirrel: { price: 2500, emoji: '🐿️' },
-        goldfish: { price: 1000, emoji: ' goldfish' }, // Note: Goldfish emoji might render as fish
-        eagle: { price: 10000, emoji: '🦅' },
-        lion: { price: 20000, emoji: '🦁' },
-        tiger: { price: 22000, emoji: '🐯' },
+        dog: { price: 40000, emoji: '🐶' },
+        cat: { price: 12000, emoji: '🐱' },
+        hamster: { price: 1000000, emoji: '🐹' },
+        rabbit: { price: 5000, emoji: '🐰' },
+        parrot: { price: 8000, emoji: '🦜' },
+        horse: { price: 25000, emoji: '🐎' },
+        squirrel: { price: 7000, emoji: '🐿️' },
+        goldfish: { price: 5000, emoji: ' goldfish' }, // Note: Goldfish emoji might render as fish
+        eagle: { price: 50000, emoji: '🦅' },
+        lion: { price: 80000, emoji: '🦁' },
+        tiger: { price: 100000, emoji: '🐯' },
     },
 };
