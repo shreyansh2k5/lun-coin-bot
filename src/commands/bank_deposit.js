@@ -1,8 +1,6 @@
 // src/commands/bank_deposit.js
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { BANK_TOGGLE_COOLDOWN_MS } = require('../config/gameConfig');
-
-const bankToggleCooldowns = new Map(); // Stores userId -> lastUsedTimestamp for bank toggle
+const { BANK_DEPOSIT_COOLDOWN_MS } = require('../config/gameConfig'); // Use new constant
 
 /**
  * Factory function to create the bank_deposit command.
@@ -19,34 +17,35 @@ module.exports = (coinManager) => ({
     async executeCommand(userId, username, interaction) {
         // Defer reply is handled by slashExecute, so no need to defer here again
         const now = Date.now();
-        const lastUsed = bankToggleCooldowns.get(userId);
-
-        // Cooldown check for bank toggle
-        if (lastUsed && (now - lastUsed < BANK_TOGGLE_COOLDOWN_MS)) {
-            const timeLeft = BANK_TOGGLE_COOLDOWN_MS - (now - lastUsed);
-            const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-            const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-
-            let timeString = '';
-            if (hours > 0) timeString += `${hours} hour(s) `;
-            if (minutes > 0) timeString += `${minutes} minute(s) `;
-            if (seconds > 0) timeString += `${seconds} second(s) `;
-            timeString = timeString.trim();
-
-            return interaction.followUp({ content: `You can change your safe mode status again in ${timeString}.`, flags: MessageFlags.Ephemeral });
-        }
 
         try {
             const userData = await coinManager.getUserData(userId);
+            const lastDeposited = userData.lastBankDeposit; // Get last deposit timestamp
+
+            // Cooldown check for deposit
+            if (lastDeposited && (now - lastDeposited < BANK_DEPOSIT_COOLDOWN_MS)) {
+                const timeLeft = BANK_DEPOSIT_COOLDOWN_MS - (now - lastDeposited);
+                const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+                const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+                let timeString = '';
+                if (hours > 0) timeString += `${hours} hour(s) `;
+                if (minutes > 0) timeString += `${minutes} minute(s) `;
+                if (seconds > 0) timeString += `${seconds} second(s) `;
+                timeString = timeString.trim();
+
+                return interaction.followUp({ content: `You can deposit (activate safe mode) again in ${timeString}.`, flags: MessageFlags.Ephemeral });
+            }
+
             if (userData.isBanked) {
                 return interaction.followUp({ content: `${username}, you are already in safe mode!`, flags: MessageFlags.Ephemeral });
             }
 
-            await coinManager.setBankedStatus(userId, true);
-            bankToggleCooldowns.set(userId, now); // Set cooldown
+            await coinManager.setBankedStatus(userId, true); // This will update lastBankDeposit in coinManager
+            // No need to set cooldown in Map here, as it's handled by Firestore timestamp
 
-            await interaction.followUp({ content: `🏦 **${username}**, you have activated safe mode! You are now safe from raids and cannot raid others. This status will last until you use \`/withdraw\` or the cooldown expires.`, flags: MessageFlags.Ephemeral });
+            await interaction.followUp({ content: `🏦 **${username}**, you have activated safe mode! You are now safe from raids and cannot raid others. You can use \`/bank_withdraw\` anytime to deactivate.`, flags: MessageFlags.Ephemeral });
 
         } catch (error) {
             console.error(`Error in bank_deposit command for ${username}:`, error);
