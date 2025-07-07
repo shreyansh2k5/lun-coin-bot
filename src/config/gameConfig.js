@@ -2,14 +2,14 @@
 
 module.exports = {
     // Coin System Defaults
-    DEFAULT_BALANCE: 10000,
+    DEFAULT_BALANCE: 5000,
 
     // Daily Command
-    DAILY_REWARD: 5000,
+    DAILY_REWARD: 2500,
     DAILY_COOLDOWN_MS: 24 * 60 * 60 * 1000, // 24 hours
 
     // Beg Command
-    MIN_BEG_REWARD: 1,
+    MIN_BEG_REWARD: 100,
     MAX_BEG_REWARD: 1000,
     BEG_COOLDOWN_MS: 5 * 60 * 1000, // 5 minutes
 
